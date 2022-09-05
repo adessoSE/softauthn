@@ -107,10 +107,10 @@ public class Credentials {
             Set<PublicKeyCredentialDescriptor> excludeCredentials = options.getExcludeCredentials()
                     .orElse(Collections.emptySet());
 
-            authenticator.makeCredential();
+            //authenticator.makeCredential();
 
         }
-
+        return null;
     }
 
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(
