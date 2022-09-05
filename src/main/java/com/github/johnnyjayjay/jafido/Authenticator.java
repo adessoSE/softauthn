@@ -16,6 +16,9 @@ import java.security.NoSuchAlgorithmException;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECGenParameterSpec;
+import java.security.spec.MGF1ParameterSpec;
+import java.security.spec.PSSParameterSpec;
+import java.security.spec.RSAKeyGenParameterSpec;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -33,9 +36,9 @@ public class Authenticator {
     static {
         Security.addProvider(new BouncyCastleProvider());
         generatorMappings.put(COSEAlgorithmIdentifier.ES256, new KeyGenParams("EC", new ECGenParameterSpec("secp256r1")));
-        // or maybe just "Ed25519" as alg name and no parameter spec
-        generatorMappings.put(COSEAlgorithmIdentifier.EdDSA, new KeyGenParams("EdDSA", new EdDSAParameterSpec("Ed25519"))); // EdDSA keyparameter spec
-        //generatorMappings.put(COSEAlgorithmIdentifier.RS256, new KeyGenParams("RSASSA-PSS", null)); // RSASSA-PSS keyparameter spec (bouncycastle?)
+        generatorMappings.put(COSEAlgorithmIdentifier.EdDSA, new KeyGenParams("EdDSA", new EdDSAParameterSpec("Ed25519")));
+        generatorMappings.put(COSEAlgorithmIdentifier.RS256, new KeyGenParams("RSASSA-PSS", null));
+        generatorMappings.put(COSEAlgorithmIdentifier.RS1, new KeyGenParams("RSASSA-PSS", null));
     }
 
     public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
@@ -47,6 +50,13 @@ public class Authenticator {
         KeyPairGenerator gen2 = KeyPairGenerator.getInstance("EdDSA");
         gen2.initialize(new EdDSAParameterSpec("Ed25519"));
         gen2.generateKeyPair();
+
+        KeyPairGenerator gen3 = KeyPairGenerator.getInstance("RSASSA-PSS");
+
+        //gen3.initialize(new RSAKeyGenParameterSpec());
+        //gen3.initialize(new PSSParameterSpec("SHA-256", "mgf1SHA256", new MGF1ParameterSpec("SHA-256"), 20, 1));
+        KeyPair pair1 = gen3.generateKeyPair();
+        System.out.println(pair1.getPublic());
     }
 
     private final AuthenticatorAttachment attachment;
