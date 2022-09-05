@@ -14,6 +14,7 @@ like "real" ones in pure software.
 
 ## Usage
 
+### Creating and Registering authenticators
 ```java
 // Create an authenticator that will implement the functionality of a WebAuthn authenticator in pure software
 // This one mimics a traditional USB key: it is external (attachment), does not have proper storage for keys and can verify users (e.g. via a pin code)
@@ -27,6 +28,8 @@ PublicKeyCredentialCreationOptions opts = callYourBackend();
 credentials.create(opts);
 ```
 
+### Creating Assertions
+
 ## Completeness
 
 While this library does aim to come close to the WebAuthn specification, it does not implement all of its features.
@@ -34,3 +37,14 @@ These aspects are currently unsupported:
 - Enterprise attestation
 - Token Binding
 - Client Extensions
+
+Additionally, only the algorithms/COSE specifiers supported by `java-webauthn-server` are implemented. 
+Currently, those are:
+- EdDSA
+- ES256
+- RS256
+- RS1
+
+See [IANA COSE Algorithm Registry](https://www.iana.org/assignments/cose/cose.xhtml#algorithms) for reference.
+If this list is out of date because `java-webauthn-server` added a new algorithm, feel free to create an issue in 
+this repository and I will do my best to update the library accordingly.
