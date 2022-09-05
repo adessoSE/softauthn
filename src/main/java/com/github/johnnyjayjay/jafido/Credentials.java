@@ -107,8 +107,11 @@ public class Credentials {
             Set<PublicKeyCredentialDescriptor> excludeCredentials = options.getExcludeCredentials()
                     .orElse(Collections.emptySet());
 
-            authenticator.makeCredential();
-
+            authenticator.makeCredential(
+                clientDataHash, options.getRp(), options.getUser(),
+                requireResidentKey, userVerification, credTypesAndPubKeyAlgs,
+                excludeCredentials, enterpriseAttestationPossible, null
+            );
         }
 
     }
