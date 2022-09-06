@@ -113,7 +113,7 @@ public class Credentials {
                 excludeCredentials, enterpriseAttestationPossible, null
             );
         }
-
+        return null;
     }
 
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(
