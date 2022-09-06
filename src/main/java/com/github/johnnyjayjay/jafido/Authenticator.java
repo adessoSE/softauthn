@@ -1,6 +1,7 @@
 package com.github.johnnyjayjay.jafido;
 
 import com.yubico.webauthn.data.AttestationObject;
+import com.yubico.webauthn.data.AttestedCredentialData;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.COSEAlgorithmIdentifier;
@@ -24,15 +25,12 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ThreadLocalRandom;
 
 public class Authenticator {
 
     private final SecureRandom random;
-    private final Map<ByteArray, PublicKeyCredentialSource> storedSources;
-    // EdDSA =
-    // ESXXX = EC + secpXXXr1 ?
-
-
+    private final Map<SourceKey, PublicKeyCredentialSource> storedSources;
 
     private static final Map<COSEAlgorithmIdentifier, KeyGenParams> generatorMappings = new HashMap<>();
 
@@ -60,6 +58,14 @@ public class Authenticator {
         //gen3.initialize(new PSSParameterSpec("SHA-256", "mgf1SHA256", new MGF1ParameterSpec("SHA-256"), 20, 1));
         KeyPair pair1 = gen3.generateKeyPair();
         System.out.println(pair1.getPublic());
+
+        byte[] handle = new byte[48];
+        ThreadLocalRandom.current().nextBytes(handle);
+        PublicKeyCredentialSource source = new PublicKeyCredentialSource(PublicKeyCredentialType.PUBLIC_KEY, pair.getPrivate(), "localhost", new ByteArray(handle));
+        ByteArray encrypted = source.encrypt();
+        System.out.println(encrypted.getBase64().length());
+        PublicKeyCredentialSource decrypted = PublicKeyCredentialSource.decrypt(encrypted).get();
+        System.out.println(decrypted);
     }
 
     private final AuthenticatorAttachment attachment;
@@ -103,12 +109,25 @@ public class Authenticator {
                 "Authenticator cannot perform user verification");
         }
 
-        // TODO: 26/08/2022 don't use fixed algorithm
-        KeyPairGenerator generator = KeyPairGenerator.getInstance("EdDSA");
+        PublicKeyCredentialParameters params = credTypesAndPubKeyAlgs.stream()
+                .filter(p -> generatorMappings.containsKey(p.getAlg()))
+                .findFirst()
+                .orElseThrow(() -> new UnsupportedOperationException("Authenticator does not support any of the available algorithms"));
+
+
+        KeyGenParams keyGenParams = generatorMappings.get(params.getAlg());
+        KeyPairGenerator generator = KeyPairGenerator.getInstance(keyGenParams.keyGeneratorAlgorithm);
+        if (keyGenParams.algSpec != null) {
+            try {
+                generator.initialize(keyGenParams.algSpec);
+            } catch (InvalidAlgorithmParameterException e) {
+                throw new AssertionError(e);
+            }
+        }
         KeyPair keyPair = generator.generateKeyPair();
         ByteArray userHandle = userEntity.getId();
         PublicKeyCredentialSource credentialSource = new PublicKeyCredentialSource(
-            PublicKeyCredentialType.PUBLIC_KEY,
+            params.getType(),
             keyPair.getPrivate(),
             rpEntity.getId(),
             userHandle
@@ -117,24 +136,36 @@ public class Authenticator {
         if (requireResidentKey) {
             byte[] credentialId = new byte[64];
             random.nextBytes(credentialId);
-
+            credentialSource.setId(new ByteArray(credentialId));
+            storedSources.put(new SourceKey(rpEntity.getId(), userHandle), credentialSource);
         } else {
-
+            ByteArray credentialId = credentialSource.encrypt();
         }
-
+        // TODO: 06/09/2022 produce attestation data, cose key encoding and all that
+        return null;
     }
 
     private PublicKeyCredentialSource lookup(ByteArray credentialId) {
-
+        return null;
     }
 
-    static final class KeyGenParams {
+    private static final class KeyGenParams {
         final String keyGeneratorAlgorithm;
         final AlgorithmParameterSpec algSpec;
 
         KeyGenParams(String keyGeneratorAlgorithm, AlgorithmParameterSpec algSpec) {
             this.keyGeneratorAlgorithm = keyGeneratorAlgorithm;
             this.algSpec = algSpec;
+        }
+    }
+
+    private static final class SourceKey {
+        final String rpId;
+        final ByteArray userHandle;
+
+        SourceKey(String rpId, ByteArray userHandle) {
+            this.rpId = rpId;
+            this.userHandle = userHandle;
         }
     }
 

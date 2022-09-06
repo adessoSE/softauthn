@@ -5,13 +5,17 @@ import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.yubico.internal.util.JacksonCodecs;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
+import com.yubico.webauthn.data.exception.Base64UrlException;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.security.KeyFactory;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.security.PrivateKey;
-import java.security.spec.EdDSAParameterSpec;
 import java.util.Optional;
 
 public class PublicKeyCredentialSource {
@@ -22,6 +26,8 @@ public class PublicKeyCredentialSource {
   private final PrivateKey privateKey;
   private final String rpId;
   private final ByteArray userHandle;
+
+  private ByteArray id;
 
   public PublicKeyCredentialSource(PublicKeyCredentialType type, PrivateKey privateKey, String rpId, ByteArray userHandle) {
     this.type = type;
@@ -47,16 +53,24 @@ public class PublicKeyCredentialSource {
   }
 
   public ByteArray encrypt() {
-    ObjectNode object = mapper.createObjectNode()
-        .put("type", type.getId())
-        .put("privateKey", new ByteArray(privateKey.getEncoded()).getBase64Url())
+    ByteArrayOutputStream privateKeyBytes = new ByteArrayOutputStream();
+    try (ObjectOutputStream oos = new ObjectOutputStream(privateKeyBytes)) {
+      oos.writeObject(privateKey);
+    } catch (IOException e) {
+      throw new AssertionError(e);
+    }
+
+    ObjectNode object = JacksonCodecs.cbor().createObjectNode()
+        .put("type", type.ordinal())
+        .put("privateKey", privateKeyBytes.toByteArray())
         .put("rpId", rpId);
+
     if (userHandle != null) {
-      object.put("userHandle", userHandle.getBase64Url());
+      object.put("userHandle", userHandle.getBytes());
     }
     byte[] serialized;
     try {
-      serialized = mapper.writeValueAsBytes(object);
+      serialized = JacksonCodecs.cbor().writeValueAsBytes(object);
     } catch (JsonProcessingException e) {
       throw new AssertionError(e);
     }
@@ -65,17 +79,46 @@ public class PublicKeyCredentialSource {
 
   public static Optional<PublicKeyCredentialSource> decrypt(ByteArray credentialId) {
     try {
-      JsonNode node = mapper.readTree(credentialId.getBytes());
+      JsonNode node = JacksonCodecs.cbor().readTree(credentialId.getBytes());
       if (!node.isObject()) {
         return Optional.empty();
       }
       ObjectNode object = (ObjectNode) node;
-      // TODO: 26/08/2022 implement
-      return Optional.empty();
-    } catch(StreamReadException e) {
+      PublicKeyCredentialType type = PublicKeyCredentialType.values()[object.get("type").asInt()];
+      ByteArrayInputStream privateKeyBytes = new ByteArrayInputStream(object.get("privateKey").binaryValue());
+      PrivateKey privateKey;
+      try (ObjectInputStream ois = new ObjectInputStream(privateKeyBytes)) {
+        privateKey = (PrivateKey) ois.readObject();
+      }
+      String rpId = object.get("rpId").asText();
+      JsonNode encodedUserHandle = object.get("userHandle");
+      ByteArray userHandle = null;
+      if (encodedUserHandle != null) {
+        userHandle = new ByteArray(encodedUserHandle.binaryValue());
+      }
+      return Optional.of(new PublicKeyCredentialSource(type, privateKey, rpId, userHandle));
+    } catch(StreamReadException | ClassNotFoundException e) {
       return Optional.empty();
     } catch (IOException e) {
       throw new AssertionError(e);
     }
+  }
+
+  @Override
+  public String toString() {
+    return "PublicKeyCredentialSource{" +
+            "type=" + type +
+            ", privateKey=" + privateKey +
+            ", rpId='" + rpId + '\'' +
+            ", userHandle=" + userHandle +
+            '}';
+  }
+
+  public ByteArray getId() {
+    return id;
+  }
+
+  public void setId(ByteArray id) {
+    this.id = id;
   }
 }
