@@ -156,6 +156,7 @@ public class Authenticator {
         }
         // TODO: 06/09/2022 produce  cose key encoding
 
+        // cose import on RP side: https://github.com/Yubico/java-webauthn-server/blob/main/webauthn-server-core/src/main/java/com/yubico/webauthn/FinishRegistrationSteps.java#L313
         byte[] cosePublicKey = null;
         int attestedCredentialDataLength = 16 + 2 + credentialId.length + cosePublicKey.length;
         ByteBuffer attestedCredentialData = ByteBuffer.allocate(attestedCredentialDataLength)
