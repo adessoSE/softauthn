@@ -13,9 +13,13 @@ import com.yubico.webauthn.data.UserIdentity;
 import org.bouncycastle.jcajce.spec.EdDSAParameterSpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -25,6 +29,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 
 public class Authenticator {
@@ -68,16 +73,23 @@ public class Authenticator {
         System.out.println(decrypted);
     }
 
+    private final byte[] aaguid;
     private final AuthenticatorAttachment attachment;
-    private final boolean residentKey;
+    private final boolean supportsClientSideDiscoverablePublicKeyCredentialSources;
 
-    private final boolean canPerformUserVerification;
+    private final boolean supportsUserVerification;
 
 
-    public Authenticator(AuthenticatorAttachment attachment, boolean residentKey, boolean canPerformUserVerification) {
+    public Authenticator(
+            byte[] aaguid,
+            AuthenticatorAttachment attachment,
+            boolean supportsClientSideDiscoverablePublicKeyCredentialSources,
+            boolean supportsUserVerification
+    ) {
+        this.aaguid = aaguid;
         this.attachment = attachment;
-        this.residentKey = residentKey;
-        this.canPerformUserVerification = canPerformUserVerification;
+        this.supportsClientSideDiscoverablePublicKeyCredentialSources = supportsClientSideDiscoverablePublicKeyCredentialSources;
+        this.supportsUserVerification = supportsUserVerification;
         this.storedSources = new HashMap<>();
         random = new SecureRandom();
     }
@@ -99,12 +111,12 @@ public class Authenticator {
 
         }
 
-        if (requireResidentKey && !residentKey) {
+        if (requireResidentKey && !supportsClientSideDiscoverablePublicKeyCredentialSources) {
             throw new UnsupportedOperationException(
                 "Authenticator cannot store client-side discoverable public key credential sources");
         }
 
-        if (requireUserVerification && !canPerformUserVerification) {
+        if (requireUserVerification && !supportsUserVerification) {
             throw new UnsupportedOperationException(
                 "Authenticator cannot perform user verification");
         }
@@ -133,15 +145,42 @@ public class Authenticator {
             userHandle
         );
 
+        byte[] credentialId;
         if (requireResidentKey) {
-            byte[] credentialId = new byte[64];
+            credentialId = new byte[64];
             random.nextBytes(credentialId);
             credentialSource.setId(new ByteArray(credentialId));
             storedSources.put(new SourceKey(rpEntity.getId(), userHandle), credentialSource);
         } else {
-            ByteArray credentialId = credentialSource.encrypt();
+            credentialId = credentialSource.encrypt().getBytes();
         }
-        // TODO: 06/09/2022 produce attestation data, cose key encoding and all that
+        // TODO: 06/09/2022 produce  cose key encoding
+
+        byte[] cosePublicKey = null;
+        int attestedCredentialDataLength = 16 + 2 + credentialId.length + cosePublicKey.length;
+        ByteBuffer attestedCredentialData = ByteBuffer.allocate(attestedCredentialDataLength)
+                .order(ByteOrder.BIG_ENDIAN)
+                .put(aaguid, 0, 16)
+                .putShort((short) credentialId.length)
+                .put(credentialId)
+                .put(cosePublicKey);
+
+        attestedCredentialData.rewind();
+        // TODO: 08/09/2022 support different signature counter styles
+        // TODO: 08/09/2022 extract to helper method for use in assertion method
+        int signatureCounter = 0;
+        MessageDigest sha256 = MessageDigest.getInstance("SHA-256");
+        byte[] rpIdHash = sha256.digest(rpEntity.getId().getBytes(StandardCharsets.UTF_8));
+        byte flags = 0b01000101;
+        ByteBuffer authenticatorData = ByteBuffer.allocate(32 + 1 + 4 + attestedCredentialDataLength)
+                .order(ByteOrder.BIG_ENDIAN)
+                .put(rpIdHash, 0, 32)
+                .put(flags)
+                .putInt(signatureCounter)
+                .put(attestedCredentialData);
+
+        // TODO: 08/09/2022 generate attestation object
+
         return null;
     }
 
@@ -173,11 +212,11 @@ public class Authenticator {
         return attachment;
     }
 
-    public boolean isResidentKey() {
-        return residentKey;
+    public boolean supportsClientSideDiscoverablePublicKeyCredentialSources() {
+        return supportsClientSideDiscoverablePublicKeyCredentialSources;
     }
 
-    public boolean canPerformUserVerification() {
-        return canPerformUserVerification;
+    public boolean supportsUserVerification() {
+        return supportsUserVerification;
     }
 }
