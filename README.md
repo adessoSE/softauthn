@@ -34,9 +34,10 @@ credentials.create(opts);
 
 While this library does aim to come close to the WebAuthn specification, it does not implement all of its features.
 These aspects are currently unsupported:
-- Enterprise attestation
+- Any type attestation other than "none"
 - Token Binding
 - Client Extensions
+- Different signature counting styles
 
 Additionally, only the algorithms/COSE specifiers supported by `java-webauthn-server` are implemented. 
 Currently, those are:
