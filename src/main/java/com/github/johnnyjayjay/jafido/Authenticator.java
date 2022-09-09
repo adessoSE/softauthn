@@ -1,5 +1,9 @@
 package com.github.johnnyjayjay.jafido;
 
+import COSE.AlgorithmID;
+import COSE.CoseException;
+import COSE.OneKey;
+import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.data.AttestationObject;
 import com.yubico.webauthn.data.AttestedCredentialData;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
@@ -10,6 +14,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import com.yubico.webauthn.data.exception.Base64UrlException;
 import org.bouncycastle.jcajce.spec.EdDSAParameterSpec;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -21,6 +26,8 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
@@ -47,7 +54,7 @@ public class Authenticator {
         generatorMappings.put(COSEAlgorithmIdentifier.RS1, new KeyGenParams("RSASSA-PSS", null));
     }
 
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException {
+    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, CoseException, Base64UrlException {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
         gen.initialize(new ECGenParameterSpec("secp256r1"));
         KeyPair pair = gen.generateKeyPair();
@@ -71,6 +78,14 @@ public class Authenticator {
         System.out.println(encrypted.getBase64().length());
         PublicKeyCredentialSource decrypted = PublicKeyCredentialSource.decrypt(encrypted).get();
         System.out.println(decrypted);
+
+        AlgorithmID algId = AlgorithmID.FromCBOR(CBORObject.FromObject(-7));
+        OneKey key = OneKey.generateKey(algId);
+        key.PublicKey().AsCBOR();
+
+        ByteArray att = ByteArray.fromBase64Url("o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVjESZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAwAAAAAAAAAAAAAAAAAAAAAAQPSCpdq1Dh_cC3G4zrGY_MX2wRQZ7jOHMk8MoEynIU9cS6VyK1AHjF61tTzw2QRdJrfDt9q05RxsU6JIgHg91falAQIDJiABIVggt42LGWVN8uek4h77CbC1GKP9BIdiaM3VETWC2zienk4iWCCCtOHlkw0T4BmtLB3i3e7vbF44Z5fZCr_IhZ6PIRzWdA");
+        CBORObject cborObject = CBORObject.DecodeFromBytes(att.getBytes());
+        System.out.println(cborObject);
     }
 
     private final byte[] aaguid;
@@ -94,10 +109,11 @@ public class Authenticator {
         random = new SecureRandom();
     }
 
-    public AttestationObject makeCredential(
+    // see https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-make-cred
+    public CBORObject makeCredential(
             byte[] hash, RelyingPartyIdentity rpEntity, UserIdentity userEntity, boolean requireResidentKey,
             boolean requireUserVerification, List<PublicKeyCredentialParameters> credTypesAndPubKeyAlgs,
-            Set<PublicKeyCredentialDescriptor> excludeCredentials, boolean enterpriseAttestationPossible, Object extensions
+            Set<PublicKeyCredentialDescriptor> excludeCredentials, boolean enterpriseAttestationPossible, byte[] extensions
     ) throws NoSuchAlgorithmException {
         for (PublicKeyCredentialDescriptor descriptor : excludeCredentials) {
             PublicKeyCredentialSource source = lookup(descriptor.getId());
@@ -127,22 +143,22 @@ public class Authenticator {
                 .orElseThrow(() -> new UnsupportedOperationException("Authenticator does not support any of the available algorithms"));
 
 
-        KeyGenParams keyGenParams = generatorMappings.get(params.getAlg());
-        KeyPairGenerator generator = KeyPairGenerator.getInstance(keyGenParams.keyGeneratorAlgorithm);
-        if (keyGenParams.algSpec != null) {
-            try {
-                generator.initialize(keyGenParams.algSpec);
-            } catch (InvalidAlgorithmParameterException e) {
-                throw new AssertionError(e);
-            }
+        OneKey key;
+        PrivateKey privateKey;
+        try {
+            AlgorithmID algId = AlgorithmID.FromCBOR(CBORObject.FromObject(params.getAlg().getId()));
+            key = OneKey.generateKey(algId);
+            privateKey = key.AsPrivateKey();
+        } catch (CoseException e) {
+            throw new UnsupportedOperationException("Algorithm " + params.getAlg() + " not supported", e);
         }
-        KeyPair keyPair = generator.generateKeyPair();
+
         ByteArray userHandle = userEntity.getId();
         PublicKeyCredentialSource credentialSource = new PublicKeyCredentialSource(
-            params.getType(),
-            keyPair.getPrivate(),
-            rpEntity.getId(),
-            userHandle
+                params.getType(),
+                privateKey,
+                rpEntity.getId(),
+                userHandle
         );
 
         byte[] credentialId;
@@ -154,10 +170,8 @@ public class Authenticator {
         } else {
             credentialId = credentialSource.encrypt().getBytes();
         }
-        // TODO: 06/09/2022 produce  cose key encoding
 
-        // cose import on RP side: https://github.com/Yubico/java-webauthn-server/blob/main/webauthn-server-core/src/main/java/com/yubico/webauthn/FinishRegistrationSteps.java#L313
-        byte[] cosePublicKey = null;
+        byte[] cosePublicKey = key.PublicKey().EncodeToBytes();
         int attestedCredentialDataLength = 16 + 2 + credentialId.length + cosePublicKey.length;
         ByteBuffer attestedCredentialData = ByteBuffer.allocate(attestedCredentialDataLength)
                 .order(ByteOrder.BIG_ENDIAN)
@@ -180,9 +194,12 @@ public class Authenticator {
                 .putInt(signatureCounter)
                 .put(attestedCredentialData);
 
-        // TODO: 08/09/2022 generate attestation object
+        // TODO: 09/09/2022 support different attestation formats
 
-        return null;
+        return CBORObject.NewMap()
+                .Add("fmt", "none")
+                .Add("attStmt", CBORObject.NewMap())
+                .Add("authData", authenticatorData.array());
     }
 
     private PublicKeyCredentialSource lookup(ByteArray credentialId) {
