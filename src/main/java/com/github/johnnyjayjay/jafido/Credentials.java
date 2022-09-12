@@ -7,6 +7,7 @@ import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.AssertionRequest;
 import com.yubico.webauthn.data.AttestationConveyancePreference;
 import com.yubico.webauthn.data.AuthenticatorAssertionResponse;
+import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.AuthenticatorAttestationResponse;
 import com.yubico.webauthn.data.AuthenticatorSelectionCriteria;
 import com.yubico.webauthn.data.ByteArray;
@@ -180,6 +181,12 @@ public class Credentials {
         byte[] credentialId = new byte[credentialIdLength];
         authenticatorData.get(credentialId);
         return credentialId;
+    }
+
+    public boolean isUserVerifyingPlatformAuthenticatorAvailable() {
+        return authenticators.stream()
+                .anyMatch(auth -> auth.supportsUserVerification()
+                        && auth.getAttachment() == AuthenticatorAttachment.PLATFORM);
     }
 
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(

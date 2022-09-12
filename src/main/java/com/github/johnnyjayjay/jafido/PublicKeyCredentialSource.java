@@ -2,28 +2,14 @@ package com.github.johnnyjayjay.jafido;
 
 import COSE.CoseException;
 import COSE.OneKey;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.exc.StreamReadException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.upokecenter.cbor.CBORException;
 import com.upokecenter.cbor.CBORObject;
-import com.yubico.internal.util.JacksonCodecs;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
-import java.security.PrivateKey;
 import java.util.Optional;
 
 public class PublicKeyCredentialSource {
-
-  private static final ObjectMapper mapper = new ObjectMapper();
 
   private final PublicKeyCredentialType type;
   private final OneKey key;
@@ -43,7 +29,7 @@ public class PublicKeyCredentialSource {
     return type;
   }
 
-  public OneKey getPrivateKey() {
+  public OneKey getKey() {
     return key;
   }
 
@@ -77,7 +63,9 @@ public class PublicKeyCredentialSource {
       if (encodedUserHandle != null) {
         userHandle = new ByteArray(encodedUserHandle.GetByteString());
       }
-      return Optional.of(new PublicKeyCredentialSource(type, key, rpId, userHandle));
+      PublicKeyCredentialSource source = new PublicKeyCredentialSource(type, key, rpId, userHandle);
+      source.setId(credentialId);
+      return Optional.of(source);
     } catch (CBORException | CoseException e) {
       return Optional.empty();
     }
