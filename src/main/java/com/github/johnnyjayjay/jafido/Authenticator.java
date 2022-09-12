@@ -4,8 +4,6 @@ import COSE.AlgorithmID;
 import COSE.CoseException;
 import COSE.OneKey;
 import com.upokecenter.cbor.CBORObject;
-import com.yubico.webauthn.data.AttestationObject;
-import com.yubico.webauthn.data.AttestedCredentialData;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.COSEAlgorithmIdentifier;
@@ -26,33 +24,25 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.SecureRandom;
 import java.security.Security;
 import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.ECGenParameterSpec;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import java.util.UUID;
-import java.util.concurrent.ThreadLocalRandom;
 
 public class Authenticator {
 
     private final SecureRandom random;
     private final Map<SourceKey, PublicKeyCredentialSource> storedSources;
 
-    private static final Map<COSEAlgorithmIdentifier, KeyGenParams> generatorMappings = new HashMap<>();
-
-    static {
-        Security.addProvider(new BouncyCastleProvider());
-        generatorMappings.put(COSEAlgorithmIdentifier.ES256, new KeyGenParams("EC", new ECGenParameterSpec("secp256r1")));
-        generatorMappings.put(COSEAlgorithmIdentifier.EdDSA, new KeyGenParams("EdDSA", new EdDSAParameterSpec("Ed25519")));
-        generatorMappings.put(COSEAlgorithmIdentifier.RS256, new KeyGenParams("RSASSA-PSS", null));
-        generatorMappings.put(COSEAlgorithmIdentifier.RS1, new KeyGenParams("RSASSA-PSS", null));
-    }
 
     public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, CoseException, Base64UrlException {
         KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
@@ -71,14 +61,6 @@ public class Authenticator {
         KeyPair pair1 = gen3.generateKeyPair();
         System.out.println(pair1.getPublic());
 
-        byte[] handle = new byte[48];
-        ThreadLocalRandom.current().nextBytes(handle);
-        PublicKeyCredentialSource source = new PublicKeyCredentialSource(PublicKeyCredentialType.PUBLIC_KEY, pair.getPrivate(), "localhost", new ByteArray(handle));
-        ByteArray encrypted = source.encrypt();
-        System.out.println(encrypted.getBase64().length());
-        PublicKeyCredentialSource decrypted = PublicKeyCredentialSource.decrypt(encrypted).get();
-        System.out.println(decrypted);
-
         AlgorithmID algId = AlgorithmID.FromCBOR(CBORObject.FromObject(-7));
         OneKey key = OneKey.generateKey(algId);
         key.PublicKey().AsCBOR();
@@ -90,6 +72,7 @@ public class Authenticator {
 
     private final byte[] aaguid;
     private final AuthenticatorAttachment attachment;
+    private final Set<AlgorithmID> supportedAlgorithms;
     private final boolean supportsClientSideDiscoverablePublicKeyCredentialSources;
 
     private final boolean supportsUserVerification;
@@ -98,11 +81,13 @@ public class Authenticator {
     public Authenticator(
             byte[] aaguid,
             AuthenticatorAttachment attachment,
+            Collection<AlgorithmID> supportedAlgorithms,
             boolean supportsClientSideDiscoverablePublicKeyCredentialSources,
             boolean supportsUserVerification
     ) {
         this.aaguid = aaguid;
         this.attachment = attachment;
+        this.supportedAlgorithms = EnumSet.copyOf(supportedAlgorithms);
         this.supportsClientSideDiscoverablePublicKeyCredentialSources = supportsClientSideDiscoverablePublicKeyCredentialSources;
         this.supportsUserVerification = supportsUserVerification;
         this.storedSources = new HashMap<>();
@@ -137,38 +122,41 @@ public class Authenticator {
                 "Authenticator cannot perform user verification");
         }
 
-        PublicKeyCredentialParameters params = credTypesAndPubKeyAlgs.stream()
-                .filter(p -> generatorMappings.containsKey(p.getAlg()))
+
+        AlgorithmID algId = credTypesAndPubKeyAlgs.stream()
+                .map(PublicKeyCredentialParameters::getAlg)
+                .map(this::convertAlgId)
+                .filter(Objects::nonNull)
+                .filter(supportedAlgorithms::contains)
                 .findFirst()
                 .orElseThrow(() -> new UnsupportedOperationException("Authenticator does not support any of the available algorithms"));
 
 
         OneKey key;
-        PrivateKey privateKey;
         try {
-            AlgorithmID algId = AlgorithmID.FromCBOR(CBORObject.FromObject(params.getAlg().getId()));
             key = OneKey.generateKey(algId);
-            privateKey = key.AsPrivateKey();
         } catch (CoseException e) {
-            throw new UnsupportedOperationException("Algorithm " + params.getAlg() + " not supported", e);
+            throw new UnsupportedOperationException("Algorithm " + algId + " not supported", e);
         }
 
         ByteArray userHandle = userEntity.getId();
         PublicKeyCredentialSource credentialSource = new PublicKeyCredentialSource(
-                params.getType(),
-                privateKey,
+                PublicKeyCredentialType.PUBLIC_KEY,
+                key,
                 rpEntity.getId(),
                 userHandle
         );
 
         byte[] credentialId;
         if (requireResidentKey) {
-            credentialId = new byte[64];
+            // section 7.3 of
+            // https://fidoalliance.org/specs/fido-uaf-v1.1-id-20170202/fido-uaf-authnr-cmds-v1.1-id-20170202.html
+            credentialId = new byte[32];
             random.nextBytes(credentialId);
             credentialSource.setId(new ByteArray(credentialId));
             storedSources.put(new SourceKey(rpEntity.getId(), userHandle), credentialSource);
         } else {
-            credentialId = credentialSource.encrypt().getBytes();
+            credentialId = credentialSource.encrypt();
         }
 
         byte[] cosePublicKey = key.PublicKey().EncodeToBytes();
@@ -200,6 +188,14 @@ public class Authenticator {
                 .Add("fmt", "none")
                 .Add("attStmt", CBORObject.NewMap())
                 .Add("authData", authenticatorData.array());
+    }
+
+    private AlgorithmID convertAlgId(COSEAlgorithmIdentifier id) {
+        try {
+            return AlgorithmID.FromCBOR(CBORObject.FromObject(id.getId()));
+        } catch (CoseException e) {
+            return null;
+        }
     }
 
     private PublicKeyCredentialSource lookup(ByteArray credentialId) {

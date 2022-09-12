@@ -1,14 +1,17 @@
 package com.github.johnnyjayjay.jafido;
 
+import COSE.CoseException;
+import COSE.OneKey;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.exc.StreamReadException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import com.upokecenter.cbor.CBORException;
+import com.upokecenter.cbor.CBORObject;
 import com.yubico.internal.util.JacksonCodecs;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
-import com.yubico.webauthn.data.exception.Base64UrlException;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -23,15 +26,15 @@ public class PublicKeyCredentialSource {
   private static final ObjectMapper mapper = new ObjectMapper();
 
   private final PublicKeyCredentialType type;
-  private final PrivateKey privateKey;
+  private final OneKey key;
   private final String rpId;
   private final ByteArray userHandle;
 
   private ByteArray id;
 
-  public PublicKeyCredentialSource(PublicKeyCredentialType type, PrivateKey privateKey, String rpId, ByteArray userHandle) {
+  public PublicKeyCredentialSource(PublicKeyCredentialType type, OneKey privateKey, String rpId, ByteArray userHandle) {
     this.type = type;
-    this.privateKey = privateKey;
+    this.key = privateKey;
     this.rpId = rpId;
     this.userHandle = userHandle;
   }
@@ -40,8 +43,8 @@ public class PublicKeyCredentialSource {
     return type;
   }
 
-  public PrivateKey getPrivateKey() {
-    return privateKey;
+  public OneKey getPrivateKey() {
+    return key;
   }
 
   public String getRpId() {
@@ -52,55 +55,31 @@ public class PublicKeyCredentialSource {
     return userHandle;
   }
 
-  public ByteArray encrypt() {
-    ByteArrayOutputStream privateKeyBytes = new ByteArrayOutputStream();
-    try (ObjectOutputStream oos = new ObjectOutputStream(privateKeyBytes)) {
-      oos.writeObject(privateKey);
-    } catch (IOException e) {
-      throw new AssertionError(e);
-    }
-
-    ObjectNode object = JacksonCodecs.cbor().createObjectNode()
-        .put("type", type.ordinal())
-        .put("privateKey", privateKeyBytes.toByteArray())
-        .put("rpId", rpId);
-
+  public byte[] encrypt() {
+    CBORObject map = CBORObject.NewMap()
+            .Set("type", type.ordinal())
+            .Set("key", key.EncodeToBytes())
+            .Set("rpId", rpId);
     if (userHandle != null) {
-      object.put("userHandle", userHandle.getBytes());
+      map.Set("user", userHandle.getBytes());
     }
-    byte[] serialized;
-    try {
-      serialized = JacksonCodecs.cbor().writeValueAsBytes(object);
-    } catch (JsonProcessingException e) {
-      throw new AssertionError(e);
-    }
-    return new ByteArray(serialized);
+    return map.EncodeToBytes();
   }
 
   public static Optional<PublicKeyCredentialSource> decrypt(ByteArray credentialId) {
     try {
-      JsonNode node = JacksonCodecs.cbor().readTree(credentialId.getBytes());
-      if (!node.isObject()) {
-        return Optional.empty();
-      }
-      ObjectNode object = (ObjectNode) node;
-      PublicKeyCredentialType type = PublicKeyCredentialType.values()[object.get("type").asInt()];
-      ByteArrayInputStream privateKeyBytes = new ByteArrayInputStream(object.get("privateKey").binaryValue());
-      PrivateKey privateKey;
-      try (ObjectInputStream ois = new ObjectInputStream(privateKeyBytes)) {
-        privateKey = (PrivateKey) ois.readObject();
-      }
-      String rpId = object.get("rpId").asText();
-      JsonNode encodedUserHandle = object.get("userHandle");
+      CBORObject map = CBORObject.DecodeFromBytes(credentialId.getBytes());
+      PublicKeyCredentialType type = PublicKeyCredentialType.values()[map.get("type").AsInt32()];
+      OneKey key = new OneKey(map.get("key"));
+      String rpId = map.get("rpId").AsString();
+      CBORObject encodedUserHandle = map.get("user");
       ByteArray userHandle = null;
       if (encodedUserHandle != null) {
-        userHandle = new ByteArray(encodedUserHandle.binaryValue());
+        userHandle = new ByteArray(encodedUserHandle.GetByteString());
       }
-      return Optional.of(new PublicKeyCredentialSource(type, privateKey, rpId, userHandle));
-    } catch(StreamReadException | ClassNotFoundException e) {
+      return Optional.of(new PublicKeyCredentialSource(type, key, rpId, userHandle));
+    } catch (CBORException | CoseException e) {
       return Optional.empty();
-    } catch (IOException e) {
-      throw new AssertionError(e);
     }
   }
 
@@ -108,7 +87,7 @@ public class PublicKeyCredentialSource {
   public String toString() {
     return "PublicKeyCredentialSource{" +
             "type=" + type +
-            ", privateKey=" + privateKey +
+            ", privateKey=" + key +
             ", rpId='" + rpId + '\'' +
             ", userHandle=" + userHandle +
             '}';

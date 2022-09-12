@@ -140,7 +140,7 @@ public class Credentials {
             byte[] aaguid = extractAaguid(attestationObjectResult);
             if (!Arrays.equals(aaguid, new byte[16])
                     || !attestationObjectResult.get("fmt").AsString().equals("packed")
-                    || !attestationObjectResult.get("x5c").isUndefined()) {
+                    || attestationObjectResult.get("x5c") != null) {
                 censorAaguid(attestationObjectResult);
                 attestationObjectResult.Set("fmt", "none");
                 attestationObjectResult.Set("attStmt", CBORObject.NewMap());
