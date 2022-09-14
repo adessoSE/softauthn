@@ -10,6 +10,7 @@ import com.yubico.webauthn.data.AuthenticatorAssertionResponse;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.AuthenticatorAttestationResponse;
 import com.yubico.webauthn.data.AuthenticatorSelectionCriteria;
+import com.yubico.webauthn.data.AuthenticatorTransport;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.COSEAlgorithmIdentifier;
 import com.yubico.webauthn.data.ClientAssertionExtensionOutputs;
@@ -18,6 +19,7 @@ import com.yubico.webauthn.data.PublicKeyCredential;
 import com.yubico.webauthn.data.PublicKeyCredentialCreationOptions;
 import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
 import com.yubico.webauthn.data.PublicKeyCredentialParameters;
+import com.yubico.webauthn.data.PublicKeyCredentialRequestOptions;
 import com.yubico.webauthn.data.ResidentKeyRequirement;
 import com.yubico.webauthn.data.UserVerificationRequirement;
 import com.yubico.webauthn.data.exception.Base64UrlException;
@@ -25,29 +27,41 @@ import com.yubico.webauthn.data.exception.Base64UrlException;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 import static com.github.johnnyjayjay.jafido.Checks.check;
 
 // navigator.credentials simulator
 public class Credentials {
 
-    private final String origin;
+    private final Origin origin;
     private final List<Authenticator> authenticators;
 
     private final ObjectMapper mapper;
 
-    public Credentials(String origin, List<? extends Authenticator> authenticators) {
+    public Credentials(Origin origin, List<? extends Authenticator> authenticators) {
         this.origin = origin;
         this.authenticators = new ArrayList<>(authenticators);
         this.mapper = new ObjectMapper();
+    }
+
+    public PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
+            PublicKeyCredentialCreationOptions publicKey
+    ) {
+        return create(origin, publicKey, true);
     }
 
     // following https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-createCredential
@@ -55,36 +69,16 @@ public class Credentials {
             Origin origin,
             PublicKeyCredentialCreationOptions options,
             boolean sameOriginWithAncestors
-    ) throws JsonProcessingException, NoSuchAlgorithmException {
-        // 2.
-        check(sameOriginWithAncestors, "NotAllowedError (sameOriginWithAncestors)");
-        // 4. skip irrelevant timeout steps
-        // 5. skip irrelevant user id check
-        // 6.
-        check(origin != null, "NotAllowedError (opaque origin)");
-        // 7.
-        String effectiveDomain = origin.effectiveDomain();
-        // TODO: 25/08/2022 validate domain
-        // 8. skip rpId check, it's always set by Relying Party
+    ) {
+        
+        checkParameters(options.getRp().getId(), origin, sameOriginWithAncestors);
         // 9-10.
         List<PublicKeyCredentialParameters> credTypesAndPubKeyAlgs = options.getPubKeyCredParams().isEmpty()
                 ? Arrays.asList(PublicKeyCredentialParameters.builder().alg(COSEAlgorithmIdentifier.ES256).build(),
                 PublicKeyCredentialParameters.builder().alg(COSEAlgorithmIdentifier.RS256).build())
                 : options.getPubKeyCredParams();
-        // TODO: 25/08/2022 handle extensions
 
-        // 13.
-        ObjectNode collectedClientData = mapper.createObjectNode()
-                .put("type", "webauthn.create")
-                .put("challenge", options.getChallenge().getBase64Url())
-                .put("origin", origin.serialized())
-                .put("crossOrigin", !sameOriginWithAncestors);
-
-        // 14.
-        String clientDataJson = mapper.writeValueAsString(collectedClientData);
-        // 15.
-        MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        byte[] clientDataHash = digest.digest(clientDataJson.getBytes(StandardCharsets.UTF_8));
+        ClientData clientData = collectClientData(options.getChallenge(), origin, sameOriginWithAncestors);
 
         for (Authenticator authenticator : authenticators) {
             if (options.getAuthenticatorSelection()
@@ -113,14 +107,14 @@ public class Credentials {
                     .orElse(Collections.emptySet());
 
             CBORObject attestationObject = authenticator.makeCredential(
-                    clientDataHash, options.getRp(), options.getUser(),
+                    clientData.clientDataHash, options.getRp(), options.getUser(),
                     requireResidentKey, userVerification, credTypesAndPubKeyAlgs,
                     excludeCredentials, enterpriseAttestationPossible, null
             );
             try {
                 return constructCredentialAlg(
                         attestationObject,
-                        clientDataJson.getBytes(StandardCharsets.UTF_8),
+                        clientData.clientDataJson,
                         options.getAttestation(),
                         ClientRegistrationExtensionOutputs.builder().build()
                 );
@@ -190,9 +184,116 @@ public class Credentials {
     }
 
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(
-            AssertionRequest publicKey
+            PublicKeyCredentialRequestOptions publicKey
     ) {
+        return discoverFromExternalSource(origin, publicKey, true);
+    }
+
+    private PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> discoverFromExternalSource(
+            Origin origin, PublicKeyCredentialRequestOptions options, boolean sameOriginWithAncestors
+    ) {
+        checkParameters(options.getRpId(), origin, sameOriginWithAncestors);
+        ClientData clientData = collectClientData(options.getChallenge(), origin, sameOriginWithAncestors);
+        for (Authenticator authenticator : authenticators) {
+            if (options.getUserVerification()
+                    .map(UserVerificationRequirement.REQUIRED::equals)
+                    .orElse(false) && !authenticator.supportsUserVerification()) {
+                continue;
+            }
+
+            boolean userVerification = !options.getUserVerification()
+                    .map(UserVerificationRequirement.DISCOURAGED::equals).orElse(false)
+                    && authenticator.supportsUserVerification();
+
+            List<PublicKeyCredentialDescriptor> allowCredentials = options.getAllowCredentials().orElse(Collections.emptyList());
+
+            ByteArray savedCredentialId = allowCredentials.size() == 1 ? allowCredentials.get(0).getId() : null;
+
+            // skip transport handling (not relevant for software authenticators)
+
+            AuthenticatorAssertionData assertionData = authenticator.getAssertion(
+                    options.getRpId(),
+                    clientData.clientDataHash,
+                    allowCredentials.isEmpty() ? null : allowCredentials,
+                    userVerification,
+                    null
+            );
+
+            try {
+                return constructAssertionAlg(assertionData, clientData);
+            } catch (Base64UrlException | IOException e) {
+                throw new RuntimeException("Error while creating assertion", e);
+            }
+        }
         return null;
+    }
+
+    private PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> constructAssertionAlg(
+            AuthenticatorAssertionData assertionData,
+            ClientData clientData
+    ) throws Base64UrlException, IOException {
+        return PublicKeyCredential.<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs>builder()
+                .id(assertionData.getCredentialId())
+                .response(AuthenticatorAssertionResponse.builder()
+                        .authenticatorData(assertionData.getAuthenticatorData())
+                        .clientDataJSON(new ByteArray(clientData.clientDataJson))
+                        .signature(assertionData.getSignature())
+                        .userHandle(Optional.ofNullable(assertionData.getUserHandle()))
+                        .build())
+                .clientExtensionResults(ClientAssertionExtensionOutputs.builder().build())
+                .build();
+    }
+
+    private void checkParameters(String rpId, Origin origin, boolean sameOriginWithAncestors) {
+        // 2.
+        check(sameOriginWithAncestors, "NotAllowedError (sameOriginWithAncestors)");
+        // 4. skip irrelevant timeout steps
+        // 5. skip irrelevant user id check
+        // 6.
+        check(origin != null, "NotAllowedError (opaque origin)");
+        // 7.
+        String effectiveDomain = origin.effectiveDomain();
+        // TODO: 25/08/2022 validate domain
+        // 8. skip rpId check, it's always set by Relying Party
+    }
+    
+    private Map<String, String> processExtensions() {
+        // TODO: 25/08/2022 handle extensions
+        return new HashMap<>();
+    }
+
+    private ClientData collectClientData(ByteArray challenge, Origin origin, boolean sameOriginWithAncestors) {
+
+        ObjectNode collectedClientData = mapper.createObjectNode()
+                .put("type", "webauthn.create")
+                .put("challenge", challenge.getBase64Url())
+                .put("origin", origin.serialized())
+                .put("crossOrigin", !sameOriginWithAncestors);
+
+        byte[] clientDataJson;
+        try {
+            clientDataJson = mapper.writeValueAsBytes(collectedClientData);
+        } catch (JsonProcessingException e) {
+            throw new AssertionError(e);
+        }
+        MessageDigest digest;
+        try {
+            digest = MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("Required algorithm unavailable", e);
+        }
+        byte[] clientDataHash = digest.digest(clientDataJson);
+        return new ClientData(clientDataJson, clientDataHash);
+    }
+
+    private static final class ClientData {
+        private final byte[] clientDataJson;
+        private final byte[] clientDataHash;
+
+        private ClientData(byte[] clientDataJson, byte[] clientDataHash) {
+            this.clientDataJson = clientDataJson;
+            this.clientDataHash = clientDataHash;
+        }
     }
 
 }

@@ -9,8 +9,8 @@ import com.yubico.webauthn.data.UserIdentity;
 
 import java.util.List;
 import java.util.Set;
-import java.util.function.Function;
 
+// TODO: 14/09/2022 use custom checked exceptions
 public interface Authenticator {
 
     CBORObject makeCredential(
