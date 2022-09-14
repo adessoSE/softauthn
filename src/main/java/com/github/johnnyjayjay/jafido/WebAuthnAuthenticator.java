@@ -14,21 +14,18 @@ import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
-import com.yubico.webauthn.data.exception.Base64UrlException;
-import org.bouncycastle.jcajce.spec.EdDSAParameterSpec;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.KeyPair;
-import java.security.KeyPairGenerator;
+import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Signature;
-import java.security.spec.ECGenParameterSpec;
+import java.security.SignatureException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.EnumSet;
@@ -44,42 +41,8 @@ import java.util.function.Function;
 
 public class WebAuthnAuthenticator implements Authenticator {
 
-    private static final Map<AlgorithmID, String> JAVA_ALGORITHM_NAMES = new HashMap<>();
-
-    static {
-        JAVA_ALGORITHM_NAMES.put(AlgorithmID.EDDSA, "EDDSA");
-        JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_256, "SHA256withECDSA");
-    }
-
     private final SecureRandom random;
     private final Map<SourceKey, PublicKeyCredentialSource> storedSources;
-
-
-    public static void main(String[] args) throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, CoseException, Base64UrlException {
-        KeyPairGenerator gen = KeyPairGenerator.getInstance("EC");
-        gen.initialize(new ECGenParameterSpec("secp256r1"));
-        KeyPair pair = gen.generateKeyPair();
-        System.out.println(pair);
-
-        KeyPairGenerator gen2 = KeyPairGenerator.getInstance("EdDSA");
-        gen2.initialize(new EdDSAParameterSpec("Ed25519"));
-        gen2.generateKeyPair();
-
-        KeyPairGenerator gen3 = KeyPairGenerator.getInstance("RSASSA-PSS");
-
-        //gen3.initialize(new RSAKeyGenParameterSpec());
-        //gen3.initialize(new PSSParameterSpec("SHA-256", "mgf1SHA256", new MGF1ParameterSpec("SHA-256"), 20, 1));
-        KeyPair pair1 = gen3.generateKeyPair();
-        System.out.println(pair1.getPublic());
-
-        AlgorithmID algId = AlgorithmID.FromCBOR(CBORObject.FromObject(-7));
-        OneKey key = OneKey.generateKey(algId);
-        key.PublicKey().AsCBOR();
-
-        ByteArray att = ByteArray.fromBase64Url("o2NmbXRkbm9uZWdhdHRTdG10oGhhdXRoRGF0YVjESZYN5YgOjGh0NBcPZHZgW4_krrmihjLHmVzzuoMdl2NFAAAAAwAAAAAAAAAAAAAAAAAAAAAAQPSCpdq1Dh_cC3G4zrGY_MX2wRQZ7jOHMk8MoEynIU9cS6VyK1AHjF61tTzw2QRdJrfDt9q05RxsU6JIgHg91falAQIDJiABIVggt42LGWVN8uek4h77CbC1GKP9BIdiaM3VETWC2zienk4iWCCCtOHlkw0T4BmtLB3i3e7vbF44Z5fZCr_IhZ6PIRzWdA");
-        CBORObject cborObject = CBORObject.DecodeFromBytes(att.getBytes());
-        System.out.println(cborObject);
-    }
 
     private final byte[] aaguid;
     private final AuthenticatorAttachment attachment;
@@ -210,6 +173,126 @@ public class WebAuthnAuthenticator implements Authenticator {
                 .array();
     }
 
+
+    // see https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-get-assertion
+    @Override
+    public AuthenticatorAssertionData getAssertion(
+            String rpId, byte[] hash,
+            List<PublicKeyCredentialDescriptor> allowedCredentialDescriptorList,
+            boolean requireUserVerification, byte[] extensions
+    ) {
+        Set<PublicKeyCredentialSource> credentialOptions = new HashSet<>();
+        if (allowedCredentialDescriptorList != null) {
+            for (PublicKeyCredentialDescriptor descriptor : allowedCredentialDescriptorList) {
+                lookup(descriptor.getId()).ifPresent(credentialOptions::add);
+            }
+        } else {
+            credentialOptions.addAll(storedSources.values());
+        }
+        credentialOptions.removeIf(source -> !rpId.equals(source.getRpId()));
+        if (credentialOptions.isEmpty()) {
+            throw new NoSuchElementException("No credential source matches input parameters");
+        }
+
+        if (requireUserVerification && !supportsUserVerification()) {
+            throw new UnsupportedOperationException("Authenticator does not support user verification");
+        }
+
+        PublicKeyCredentialSource selectedCredential
+                = credentialSelection.apply(Collections.unmodifiableSet(credentialOptions));
+
+        // TODO: 12/09/2022 handle extensions
+        byte[] processedExtensions = null;
+        int signatureCount = signatureCounter.increment(selectedCredential.getId());
+        byte[] authenticatorData = createAuthenticatorData(
+                rpId, true, requireUserVerification,
+                signatureCount, null, processedExtensions
+        );
+
+
+        OneKey key = selectedCredential.getKey();
+        AlgorithmID algId;
+        try {
+            algId = AlgorithmID.FromCBOR(key.get(KeyKeys.Algorithm));
+        } catch (CoseException e) {
+            throw new UnsupportedOperationException("Unsupported signature algorithm", e);
+        }
+        byte[] signData = new byte[authenticatorData.length + hash.length];
+        System.arraycopy(authenticatorData, 0, signData, 0, authenticatorData.length);
+        System.arraycopy(hash, 0, signData, authenticatorData.length, hash.length);
+
+        byte[] signature = computeSignature(algId, signData, key);
+        return new AuthenticatorAssertionData(selectedCredential.getId(),
+                new ByteArray(authenticatorData), new ByteArray(signature),
+                selectedCredential.getUserHandle());
+
+    }
+
+    private Optional<PublicKeyCredentialSource> lookup(ByteArray credentialId) {
+        return PublicKeyCredentialSource.decrypt(credentialId)
+                .map(Optional::of)
+                .orElseGet(() -> storedSources.values().stream().filter(source -> source.getId().equals(credentialId)).findFirst());
+    }
+
+    private byte[] computeSignature(AlgorithmID alg, byte[] rgbToBeSigned, OneKey cnKey) {
+        String algName;
+        String provider = null;
+
+        switch (alg) {
+            case ECDSA_256:
+                algName = "SHA256withECDSA";
+                break;
+            case ECDSA_384:
+                algName = "SHA384withECDSA";
+                break;
+            case ECDSA_512:
+                algName = "SHA512withECDSA";
+                break;
+            case EDDSA:
+                algName = "NonewithEdDSA";
+                provider = "EdDSA";
+                break;
+
+            case RSA_PSS_256:
+                algName = "SHA256withRSA/PSS";
+                break;
+
+            case RSA_PSS_384:
+                algName = "SHA384withRSA/PSS";
+                break;
+
+            case RSA_PSS_512:
+                algName = "SHA512withRSA/PSS";
+                break;
+
+            default:
+                throw new UnsupportedOperationException("Unsupported Algorithm Specified");
+        }
+
+        PrivateKey privKey;
+        try {
+            privKey = cnKey.AsPrivateKey();
+        } catch (CoseException e) {
+            throw new AssertionError(e);
+        }
+
+        byte[] result;
+        try {
+            Signature sig = provider == null ? Signature.getInstance(algName) :
+                    Signature.getInstance(algName, provider);
+            sig.initSign(privKey);
+            sig.update(rgbToBeSigned);
+            result = sig.sign();
+
+        } catch (NoSuchAlgorithmException ex) {
+            throw new RuntimeException("Required algorithm not available", ex);
+        } catch (SignatureException | InvalidKeyException | NoSuchProviderException e) {
+            throw new RuntimeException("Signature failed", e);
+        }
+
+        return result;
+    }
+
     private byte[] createAuthenticatorData(
             String rpId, boolean userPresence, boolean userVerification,
             int signatureCounter, byte[] attestedCredentialData, byte[] extensions
@@ -218,7 +301,7 @@ public class WebAuthnAuthenticator implements Authenticator {
         try {
             sha256 = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            throw new RuntimeException(e);
+            throw new RuntimeException("SHA-256 is not available", e);
         }
         byte[] rpIdHash = sha256.digest(rpId.getBytes(StandardCharsets.UTF_8));
 
@@ -269,140 +352,6 @@ public class WebAuthnAuthenticator implements Authenticator {
         }
     }
 
-    private Optional<PublicKeyCredentialSource> lookup(ByteArray credentialId) {
-        return PublicKeyCredentialSource.decrypt(credentialId)
-                .map(Optional::of)
-                .orElseGet(() -> storedSources.values().stream().filter(source -> source.getId().equals(credentialId)).findFirst());
-    }
-
-    // see https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-get-assertion
-    @Override
-    public AuthenticatorAssertionData getAssertion(
-            String rpId, byte[] hash,
-            List<PublicKeyCredentialDescriptor> allowedCredentialDescriptorList,
-            boolean requireUserVerification, byte[] extensions
-    ) {
-        Set<PublicKeyCredentialSource> credentialOptions = new HashSet<>();
-        if (allowedCredentialDescriptorList != null) {
-            for (PublicKeyCredentialDescriptor descriptor : allowedCredentialDescriptorList) {
-                lookup(descriptor.getId()).ifPresent(credentialOptions::add);
-            }
-        } else {
-            credentialOptions.addAll(storedSources.values());
-        }
-        credentialOptions.removeIf(source -> !rpId.equals(source.getRpId()));
-        if (credentialOptions.isEmpty()) {
-            throw new NoSuchElementException("No credential source matches input parameters");
-        }
-
-        if (requireUserVerification && !supportsUserVerification()) {
-            throw new UnsupportedOperationException("Authenticator does not support user verification");
-        }
-
-        PublicKeyCredentialSource selectedCredential
-                = credentialSelection.apply(Collections.unmodifiableSet(credentialOptions));
-
-        // TODO: 12/09/2022 handle extensions
-        byte[] processedExtensions = null;
-        int signatureCount = signatureCounter.increment(selectedCredential.getId());
-        byte[] authenticatorData = createAuthenticatorData(
-                rpId, true, requireUserVerification,
-                signatureCount, null, processedExtensions
-        );
-
-
-        OneKey key = selectedCredential.getKey();
-        AlgorithmID algId;
-        try {
-            algId = AlgorithmID.FromCBOR(key.get(KeyKeys.Algorithm));
-        } catch (CoseException e) {
-            throw new UnsupportedOperationException("Unsupported signature algorithm", e);
-        }
-        byte[] signData = new byte[authenticatorData.length + hash.length];
-        System.arraycopy(authenticatorData, 0, signData, 0, authenticatorData.length);
-        System.arraycopy(hash, 0, signData, authenticatorData.length, hash.length);
-
-        try {
-            byte[] signature = computeSignature(algId, signData, key);
-            return new AuthenticatorAssertionData(selectedCredential.getId(),
-                    new ByteArray(authenticatorData), new ByteArray(signature),
-                    selectedCredential.getUserHandle());
-        } catch (CoseException e) {
-            throw new RuntimeException("Signature failed", e);
-        }
-    }
-
-    private byte[] computeSignature(AlgorithmID alg, byte[] rgbToBeSigned, OneKey cnKey) throws CoseException {
-        String algName;
-        String provider = null;
-
-        switch (alg) {
-            case ECDSA_256:
-                algName = "SHA256withECDSA";
-                break;
-            case ECDSA_384:
-                algName = "SHA384withECDSA";
-                break;
-            case ECDSA_512:
-                algName = "SHA512withECDSA";
-                break;
-            case EDDSA:
-                algName = "NonewithEdDSA";
-                provider = "EdDSA";
-                break;
-
-            case RSA_PSS_256:
-                algName = "SHA256withRSA/PSS";
-                break;
-
-            case RSA_PSS_384:
-                algName = "SHA384withRSA/PSS";
-                break;
-
-            case RSA_PSS_512:
-                algName = "SHA512withRSA/PSS";
-                break;
-
-            default:
-                throw new CoseException("Unsupported Algorithm Specified");
-        }
-
-        if (cnKey == null) {
-            throw new NullPointerException();
-        }
-
-        PrivateKey privKey = cnKey.AsPrivateKey();
-        if (privKey == null) {
-            throw new CoseException("Private key required to sign");
-        }
-
-        byte[] result;
-        try {
-            Signature sig = provider == null ? Signature.getInstance(algName) :
-                    Signature.getInstance(algName, provider);
-            sig.initSign(privKey);
-            sig.update(rgbToBeSigned);
-            result = sig.sign();
-
-        } catch (NoSuchAlgorithmException ex) {
-            throw new CoseException("Algorithm not supported", ex);
-        } catch (Exception ex) {
-            throw new CoseException("Signature failure", ex);
-        }
-
-        return result;
-    }
-
-    private static final class SourceKey {
-        final String rpId;
-        final ByteArray userHandle;
-
-        SourceKey(String rpId, ByteArray userHandle) {
-            this.rpId = rpId;
-            this.userHandle = userHandle;
-        }
-    }
-
     @Override
     public AuthenticatorAttachment getAttachment() {
         return attachment;
@@ -416,5 +365,15 @@ public class WebAuthnAuthenticator implements Authenticator {
     @Override
     public boolean supportsUserVerification() {
         return supportsUserVerification;
+    }
+
+    private static final class SourceKey {
+        final String rpId;
+        final ByteArray userHandle;
+
+        SourceKey(String rpId, ByteArray userHandle) {
+            this.rpId = rpId;
+            this.userHandle = userHandle;
+        }
     }
 }

@@ -4,13 +4,11 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.upokecenter.cbor.CBORObject;
-import com.yubico.webauthn.AssertionRequest;
 import com.yubico.webauthn.data.AttestationConveyancePreference;
 import com.yubico.webauthn.data.AuthenticatorAssertionResponse;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.AuthenticatorAttestationResponse;
 import com.yubico.webauthn.data.AuthenticatorSelectionCriteria;
-import com.yubico.webauthn.data.AuthenticatorTransport;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.COSEAlgorithmIdentifier;
 import com.yubico.webauthn.data.ClientAssertionExtensionOutputs;
@@ -31,31 +29,34 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
-import java.util.TreeSet;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 import static com.github.johnnyjayjay.jafido.Checks.check;
 
 // navigator.credentials simulator
-public class Credentials {
+public class CredentialsContainer {
 
     private final Origin origin;
     private final List<Authenticator> authenticators;
 
     private final ObjectMapper mapper;
 
-    public Credentials(Origin origin, List<? extends Authenticator> authenticators) {
+    public CredentialsContainer(Origin origin, List<? extends Authenticator> authenticators) {
         this.origin = origin;
         this.authenticators = new ArrayList<>(authenticators);
         this.mapper = new ObjectMapper();
+    }
+
+    public boolean isUserVerifyingPlatformAuthenticatorAvailable() {
+        return authenticators.stream()
+                .anyMatch(auth -> auth.supportsUserVerification()
+                        && auth.getAttachment() == AuthenticatorAttachment.PLATFORM);
     }
 
     public PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
@@ -78,7 +79,7 @@ public class Credentials {
                 PublicKeyCredentialParameters.builder().alg(COSEAlgorithmIdentifier.RS256).build())
                 : options.getPubKeyCredParams();
 
-        ClientData clientData = collectClientData(options.getChallenge(), origin, sameOriginWithAncestors);
+        ClientData clientData = collectClientData("webauthn.create", options.getChallenge(), origin, sameOriginWithAncestors);
 
         for (Authenticator authenticator : authenticators) {
             if (options.getAuthenticatorSelection()
@@ -106,11 +107,19 @@ public class Credentials {
             Set<PublicKeyCredentialDescriptor> excludeCredentials = options.getExcludeCredentials()
                     .orElse(Collections.emptySet());
 
-            CBORObject attestationObject = authenticator.makeCredential(
-                    clientData.clientDataHash, options.getRp(), options.getUser(),
-                    requireResidentKey, userVerification, credTypesAndPubKeyAlgs,
-                    excludeCredentials, enterpriseAttestationPossible, null
-            );
+            CBORObject attestationObject;
+            try {
+                attestationObject = authenticator.makeCredential(
+                        clientData.clientDataHash, options.getRp(), options.getUser(),
+                        requireResidentKey, userVerification, credTypesAndPubKeyAlgs,
+                        excludeCredentials, enterpriseAttestationPossible, null
+                );
+            } catch (IllegalStateException e) {
+                throw e;
+            } catch (RuntimeException e) {
+                continue;
+            }
+
             try {
                 return constructCredentialAlg(
                         attestationObject,
@@ -177,12 +186,6 @@ public class Credentials {
         return credentialId;
     }
 
-    public boolean isUserVerifyingPlatformAuthenticatorAvailable() {
-        return authenticators.stream()
-                .anyMatch(auth -> auth.supportsUserVerification()
-                        && auth.getAttachment() == AuthenticatorAttachment.PLATFORM);
-    }
-
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(
             PublicKeyCredentialRequestOptions publicKey
     ) {
@@ -193,7 +196,7 @@ public class Credentials {
             Origin origin, PublicKeyCredentialRequestOptions options, boolean sameOriginWithAncestors
     ) {
         checkParameters(options.getRpId(), origin, sameOriginWithAncestors);
-        ClientData clientData = collectClientData(options.getChallenge(), origin, sameOriginWithAncestors);
+        ClientData clientData = collectClientData("webauthn.get", options.getChallenge(), origin, sameOriginWithAncestors);
         for (Authenticator authenticator : authenticators) {
             if (options.getUserVerification()
                     .map(UserVerificationRequirement.REQUIRED::equals)
@@ -205,19 +208,27 @@ public class Credentials {
                     .map(UserVerificationRequirement.DISCOURAGED::equals).orElse(false)
                     && authenticator.supportsUserVerification();
 
+            // skip narrowing this list down to this specific authenticator
             List<PublicKeyCredentialDescriptor> allowCredentials = options.getAllowCredentials().orElse(Collections.emptyList());
 
-            ByteArray savedCredentialId = allowCredentials.size() == 1 ? allowCredentials.get(0).getId() : null;
+            // skip temporarily saving credential id if there is only one available - authenticator will always return the id that was used.
+            // this is technically a deviation from the spec, but in software context there is no reason to not return the credential id every time
 
-            // skip transport handling (not relevant for software authenticators)
+            // skip transport handling (also not relevant for software authenticators)
 
-            AuthenticatorAssertionData assertionData = authenticator.getAssertion(
-                    options.getRpId(),
-                    clientData.clientDataHash,
-                    allowCredentials.isEmpty() ? null : allowCredentials,
-                    userVerification,
-                    null
-            );
+
+            AuthenticatorAssertionData assertionData = null;
+            try {
+                assertionData = authenticator.getAssertion(
+                        options.getRpId(),
+                        clientData.clientDataHash,
+                        allowCredentials.isEmpty() ? null : allowCredentials,
+                        userVerification,
+                        null
+                );
+            } catch (RuntimeException e) {
+                continue;
+            }
 
             try {
                 return constructAssertionAlg(assertionData, clientData);
@@ -262,10 +273,10 @@ public class Credentials {
         return new HashMap<>();
     }
 
-    private ClientData collectClientData(ByteArray challenge, Origin origin, boolean sameOriginWithAncestors) {
+    private ClientData collectClientData(String type, ByteArray challenge, Origin origin, boolean sameOriginWithAncestors) {
 
         ObjectNode collectedClientData = mapper.createObjectNode()
-                .put("type", "webauthn.create")
+                .put("type", type)
                 .put("challenge", challenge.getBase64Url())
                 .put("origin", origin.serialized())
                 .put("crossOrigin", !sameOriginWithAncestors);
