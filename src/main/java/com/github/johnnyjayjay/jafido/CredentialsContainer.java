@@ -33,12 +33,12 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.NoSuchElementException;
 import java.util.Optional;
 import java.util.Set;
 
 import static com.github.johnnyjayjay.jafido.Checks.check;
 
+// TODO: 14/09/2022 remove yubico dependency, write own required data structures with json serialisation support
 // navigator.credentials simulator
 public class CredentialsContainer {
 

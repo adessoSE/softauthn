@@ -14,6 +14,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.PublicKeyCredentialType;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import net.i2p.crypto.eddsa.EdDSASecurityProvider;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -24,6 +25,7 @@ import java.security.NoSuchAlgorithmException;
 import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
+import java.security.Security;
 import java.security.Signature;
 import java.security.SignatureException;
 import java.util.Collection;
@@ -41,6 +43,19 @@ import java.util.function.Function;
 
 public class WebAuthnAuthenticator implements Authenticator {
 
+    private static final Map<AlgorithmID, String> JAVA_ALGORITHM_NAMES = new HashMap<>();
+
+    static {
+        Security.addProvider(new EdDSASecurityProvider());
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_256, "SHA256withECDSA");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_384, "SHA384withECDSA");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_512, "SHA512withECDSA");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.EDDSA, "NONEwithEdDSA");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_256, "SHA356withRSA/PSS");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_384, "SHA384withRSA/PSS");
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_512, "SHA512withRSA/PSS");
+    }
+
     private final SecureRandom random;
     private final Map<SourceKey, PublicKeyCredentialSource> storedSources;
 
@@ -55,6 +70,9 @@ public class WebAuthnAuthenticator implements Authenticator {
 
     private Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection;
 
+    public static void main(String[] args) throws NoSuchAlgorithmException {
+        Signature.getInstance("NONEwithEdDSA");
+    }
 
     protected WebAuthnAuthenticator(
             byte[] aaguid,
@@ -242,40 +260,10 @@ public class WebAuthnAuthenticator implements Authenticator {
     }
 
     private byte[] computeSignature(AlgorithmID alg, byte[] rgbToBeSigned, OneKey cnKey) {
-        String algName;
-        String provider = null;
-
-        switch (alg) {
-            case ECDSA_256:
-                algName = "SHA256withECDSA";
-                break;
-            case ECDSA_384:
-                algName = "SHA384withECDSA";
-                break;
-            case ECDSA_512:
-                algName = "SHA512withECDSA";
-                break;
-            case EDDSA:
-                algName = "NonewithEdDSA";
-                provider = "EdDSA";
-                break;
-
-            case RSA_PSS_256:
-                algName = "SHA256withRSA/PSS";
-                break;
-
-            case RSA_PSS_384:
-                algName = "SHA384withRSA/PSS";
-                break;
-
-            case RSA_PSS_512:
-                algName = "SHA512withRSA/PSS";
-                break;
-
-            default:
-                throw new UnsupportedOperationException("Unsupported Algorithm Specified");
+        String algName = JAVA_ALGORITHM_NAMES.get(alg);
+        if (algName == null) {
+            throw new UnsupportedOperationException("Unsupported Algorithm Specified");
         }
-
         PrivateKey privKey;
         try {
             privKey = cnKey.AsPrivateKey();
@@ -285,15 +273,13 @@ public class WebAuthnAuthenticator implements Authenticator {
 
         byte[] result;
         try {
-            Signature sig = provider == null ? Signature.getInstance(algName) :
-                    Signature.getInstance(algName, provider);
+            Signature sig = Signature.getInstance(algName);
             sig.initSign(privKey);
             sig.update(rgbToBeSigned);
             result = sig.sign();
-
         } catch (NoSuchAlgorithmException ex) {
-            throw new RuntimeException("Required algorithm not available", ex);
-        } catch (SignatureException | InvalidKeyException | NoSuchProviderException e) {
+            throw new RuntimeException("Required algorithm not available. Did you forget to register a provider?", ex);
+        } catch (SignatureException | InvalidKeyException e) {
             throw new RuntimeException("Signature failed", e);
         }
 
