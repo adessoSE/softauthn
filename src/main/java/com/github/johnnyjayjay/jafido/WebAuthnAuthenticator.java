@@ -56,7 +56,7 @@ public class WebAuthnAuthenticator implements Authenticator {
     private Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection;
 
 
-    public WebAuthnAuthenticator(
+    protected WebAuthnAuthenticator(
             byte[] aaguid,
             AuthenticatorAttachment attachment,
             Collection<AlgorithmID> supportedAlgorithms,
@@ -65,15 +65,22 @@ public class WebAuthnAuthenticator implements Authenticator {
             SignatureCounter signatureCounter,
             Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection
     ) {
+        if (aaguid.length != 16) {
+            throw new IllegalArgumentException("aaguid must be 16 bytes");
+        }
         this.aaguid = aaguid;
-        this.attachment = attachment;
-        this.supportedAlgorithms = EnumSet.copyOf(supportedAlgorithms);
+        this.attachment = Objects.requireNonNull(attachment);;
+        this.supportedAlgorithms = EnumSet.copyOf(Objects.requireNonNull(supportedAlgorithms));
         this.supportsClientSideDiscoverablePublicKeyCredentialSources = supportsClientSideDiscoverablePublicKeyCredentialSources;
         this.supportsUserVerification = supportsUserVerification;
-        this.signatureCounter = signatureCounter;
-        this.credentialSelection = credentialSelection;
+        this.signatureCounter = Objects.requireNonNull(signatureCounter);
+        this.credentialSelection = Objects.requireNonNull(credentialSelection);
         this.storedSources = new HashMap<>();
-        random = new SecureRandom();
+        this.random = new SecureRandom();
+    }
+
+    public static WebAuthnAuthenticatorBuilder builder() {
+        return new WebAuthnAuthenticatorBuilder();
     }
 
     // see https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-make-cred
