@@ -4,6 +4,7 @@ import COSE.AlgorithmID;
 import COSE.CoseException;
 import COSE.KeyKeys;
 import COSE.OneKey;
+import com.github.johnnyjayjay.jafido.counter.SignatureCounter;
 import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;
@@ -87,6 +88,8 @@ public class WebAuthnAuthenticator implements Authenticator {
 
     private final boolean supportsUserVerification;
 
+    private final SignatureCounter signatureCounter;
+
     private Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection;
 
 
@@ -96,6 +99,7 @@ public class WebAuthnAuthenticator implements Authenticator {
             Collection<AlgorithmID> supportedAlgorithms,
             boolean supportsClientSideDiscoverablePublicKeyCredentialSources,
             boolean supportsUserVerification,
+            SignatureCounter signatureCounter,
             Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection
     ) {
         this.aaguid = aaguid;
@@ -103,6 +107,7 @@ public class WebAuthnAuthenticator implements Authenticator {
         this.supportedAlgorithms = EnumSet.copyOf(supportedAlgorithms);
         this.supportsClientSideDiscoverablePublicKeyCredentialSources = supportsClientSideDiscoverablePublicKeyCredentialSources;
         this.supportsUserVerification = supportsUserVerification;
+        this.signatureCounter = signatureCounter;
         this.credentialSelection = credentialSelection;
         this.storedSources = new HashMap<>();
         random = new SecureRandom();
@@ -179,11 +184,10 @@ public class WebAuthnAuthenticator implements Authenticator {
         byte[] attestedCredentialData = createAttestedCredentialData(credentialId, cosePublicKey);
         // TODO: 12/09/2022 handle extensions
         byte[] processedExtensions = null;
-        // TODO: 08/09/2022 support different signature counter styles
-        int signatureCounter = 0;
+        int signatureCount = signatureCounter.initialize(new ByteArray(credentialId));
         byte[] authenticatorData = createAuthenticatorData(
                 rpEntity.getId(), true,
-                requireUserVerification, signatureCounter,
+                requireUserVerification, signatureCount,
                 attestedCredentialData, processedExtensions
         );
 
@@ -210,7 +214,7 @@ public class WebAuthnAuthenticator implements Authenticator {
             String rpId, boolean userPresence, boolean userVerification,
             int signatureCounter, byte[] attestedCredentialData, byte[] extensions
     ) {
-        MessageDigest sha256 = null;
+        MessageDigest sha256;
         try {
             sha256 = MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
@@ -300,11 +304,10 @@ public class WebAuthnAuthenticator implements Authenticator {
 
         // TODO: 12/09/2022 handle extensions
         byte[] processedExtensions = null;
-        // TODO: 12/09/2022 signature counter
-        int signatureCounter = 0;
+        int signatureCount = signatureCounter.increment(selectedCredential.getId());
         byte[] authenticatorData = createAuthenticatorData(
                 rpId, true, requireUserVerification,
-                signatureCounter, null, processedExtensions
+                signatureCount, null, processedExtensions
         );
 
 
@@ -413,11 +416,5 @@ public class WebAuthnAuthenticator implements Authenticator {
     @Override
     public boolean supportsUserVerification() {
         return supportsUserVerification;
-    }
-
-    public enum SignatureCounterStyle {
-        GLOBAL,
-        PER_CREDENTIAL,
-        NONE
     }
 }
