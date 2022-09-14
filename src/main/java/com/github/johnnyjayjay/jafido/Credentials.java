@@ -44,7 +44,7 @@ public class Credentials {
 
     private final ObjectMapper mapper;
 
-    public Credentials(String origin, List<Authenticator> authenticators) {
+    public Credentials(String origin, List<? extends Authenticator> authenticators) {
         this.origin = origin;
         this.authenticators = new ArrayList<>(authenticators);
         this.mapper = new ObjectMapper();
