@@ -1,6 +1,6 @@
-# jafido
+# softauthn-java
 
-jafido provides an implementation of the [WebAuthn](https://www.w3.org/TR/2021/REC-webauthn-2-20210408/) API and a software authenticator in Java, 
+softauthn provides an implementation of the [WebAuthn](https://www.w3.org/TR/2021/REC-webauthn-2-20210408/) API and a software authenticator in Java, 
 using the [`java-webauthn-server`](https://developers.yubico.com/java-webauthn-server/) library for data models. This makes it especially well-suited 
 to interface with code that uses that same library.
 

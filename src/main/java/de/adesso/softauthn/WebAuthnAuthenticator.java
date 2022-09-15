@@ -1,10 +1,10 @@
-package com.github.johnnyjayjay.jafido;
+package de.adesso.softauthn;
 
 import COSE.AlgorithmID;
 import COSE.CoseException;
 import COSE.KeyKeys;
 import COSE.OneKey;
-import com.github.johnnyjayjay.jafido.counter.SignatureCounter;
+import de.adesso.softauthn.counter.SignatureCounter;
 import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;

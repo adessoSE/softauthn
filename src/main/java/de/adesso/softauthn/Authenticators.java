@@ -1,7 +1,7 @@
-package com.github.johnnyjayjay.jafido;
+package de.adesso.softauthn;
 
-import com.github.johnnyjayjay.jafido.counter.NoSignatureCounter;
-import com.github.johnnyjayjay.jafido.counter.PerCredentialSignatureCounter;
+import de.adesso.softauthn.counter.NoSignatureCounter;
+import de.adesso.softauthn.counter.PerCredentialSignatureCounter;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 
 import java.util.Base64;

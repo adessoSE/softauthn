@@ -1,4 +1,4 @@
-package com.github.johnnyjayjay.jafido;
+package de.adesso.softauthn;
 
 import com.yubico.webauthn.data.ByteArray;
 

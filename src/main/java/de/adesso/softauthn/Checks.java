@@ -1,4 +1,4 @@
-package com.github.johnnyjayjay.jafido;
+package de.adesso.softauthn;
 
 public class Checks {
 

@@ -3,7 +3,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.johnnyjayjay"
+group = "de.adesso.softauthn"
 version = "1.0-SNAPSHOT"
 
 repositories {

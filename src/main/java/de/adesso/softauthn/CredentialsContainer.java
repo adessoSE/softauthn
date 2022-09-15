@@ -1,4 +1,4 @@
-package com.github.johnnyjayjay.jafido;
+package de.adesso.softauthn;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -35,8 +35,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
-import static com.github.johnnyjayjay.jafido.Checks.check;
 
 // TODO: 14/09/2022 remove yubico dependency, write own required data structures with json serialisation support
 // navigator.credentials simulator
@@ -257,11 +255,11 @@ public class CredentialsContainer {
 
     private void checkParameters(String rpId, Origin origin, boolean sameOriginWithAncestors) {
         // 2.
-        check(sameOriginWithAncestors, "NotAllowedError (sameOriginWithAncestors)");
+        Checks.check(sameOriginWithAncestors, "NotAllowedError (sameOriginWithAncestors)");
         // 4. skip irrelevant timeout steps
         // 5. skip irrelevant user id check
         // 6.
-        check(origin != null, "NotAllowedError (opaque origin)");
+        Checks.check(origin != null, "NotAllowedError (opaque origin)");
         // 7.
         String effectiveDomain = origin.effectiveDomain();
         // TODO: 25/08/2022 validate domain
