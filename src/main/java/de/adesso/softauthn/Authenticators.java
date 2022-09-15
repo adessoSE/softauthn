@@ -1,24 +1,30 @@
 package de.adesso.softauthn;
 
+import com.yubico.webauthn.data.ByteArray;
+import com.yubico.webauthn.data.exception.HexException;
 import de.adesso.softauthn.counter.NoSignatureCounter;
 import de.adesso.softauthn.counter.PerCredentialSignatureCounter;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 
 import java.util.Base64;
+import java.util.UUID;
 
 public final class Authenticators {
 
     private Authenticators() {
-
     }
 
     public static WebAuthnAuthenticatorBuilder yubikey5Nfc() {
-        return WebAuthnAuthenticator.builder()
-                .attachment(AuthenticatorAttachment.CROSS_PLATFORM)
-                .supportClientSideDiscoverablePublicKeyCredentialSources(true)
-                .supportUserVerification(true)
-                .signatureCounter(new PerCredentialSignatureCounter())
-                .aaguid(Base64.getDecoder().decode("2fc0579f811347eab116bb5a8db9202a"));
+        try {
+            return WebAuthnAuthenticator.builder()
+                    .attachment(AuthenticatorAttachment.CROSS_PLATFORM)
+                    .supportClientSideDiscoverablePublicKeyCredentialSources(true)
+                    .supportUserVerification(true)
+                    .signatureCounter(new PerCredentialSignatureCounter())
+                    .aaguid(ByteArray.fromHex("2fc0579f811347eab116bb5a8db9202a").getBytes());
+        } catch (HexException e) {
+            throw new AssertionError(e);
+        }
     }
 
     public static WebAuthnAuthenticatorBuilder platform() {

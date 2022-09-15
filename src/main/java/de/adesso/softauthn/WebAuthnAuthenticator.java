@@ -321,7 +321,7 @@ public class WebAuthnAuthenticator implements Authenticator {
         if (at) {
             flags++;
         }
-        flags <<= 3;
+        flags <<= 4;
         if (uv) {
             flags++;
         }

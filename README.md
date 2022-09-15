@@ -48,3 +48,16 @@ Currently, those are:
 See [IANA COSE Algorithm Registry](https://www.iana.org/assignments/cose/cose.xhtml#algorithms) for reference.
 If this list is out of date because `java-webauthn-server` added a new algorithm, feel free to create an issue in 
 this repository and I will do my best to update the library accordingly.
+
+## A note on alternatives
+As an alternative to this library, there is the test module of the [`webauthn4j`](https://github.com/webauthn4j/webauthn4j) project. 
+This module differs from softauthn in a few ways:
+
+- it is an internal module and not published as a library
+- it is undocumented
+- it has a hard dependency on Spring Boot
+- it currently supports more features
+- it uses the webauthn4j data models
+
+The last point on this list may have the biggest impact on your convenience depending on how you 
+implemented WebAuthn in your app.
