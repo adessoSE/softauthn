@@ -1,13 +1,10 @@
 package de.adesso.softauthn;
 
+import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.exception.HexException;
 import de.adesso.softauthn.counter.NoSignatureCounter;
 import de.adesso.softauthn.counter.PerCredentialSignatureCounter;
-import com.yubico.webauthn.data.AuthenticatorAttachment;
-
-import java.util.Base64;
-import java.util.UUID;
 
 public final class Authenticators {
 

@@ -40,6 +40,17 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 
+/**
+ * An implementation of {@link Authenticator} that attempts to cover most of the
+ * <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-authenticator-model">WebAuthn specification for authenticators</a>.
+ * <p>The idea behind this implementation is that it can represent many kinds of authenticators by behaving
+ * in ways that depend on the configuration of the specific instance.<br>
+ * I.e., you can configure what capabilities should be emulated by instances of this implementation. One instance could
+ * support resident keys and user verification while another could not, for example.
+ *
+ * @see #builder()
+ * @see Authenticators
+ */
 public class WebAuthnAuthenticator implements Authenticator {
 
     private static final Set<COSEAlgorithmIdentifier> COSE_LIB_SUPPORT = EnumSet.of(COSEAlgorithmIdentifier.ES256, COSEAlgorithmIdentifier.EdDSA);
@@ -51,7 +62,8 @@ public class WebAuthnAuthenticator implements Authenticator {
         JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_384, "SHA384withECDSA");
         JAVA_ALGORITHM_NAMES.put(AlgorithmID.ECDSA_512, "SHA512withECDSA");
         JAVA_ALGORITHM_NAMES.put(AlgorithmID.EDDSA, "NONEwithEdDSA");
-        JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_256, "SHA356withRSA/PSS");
+        // FIXME: 15/09/2022 these below don't actually exist, that is an issue in the COSE library. Can be fixed by using "RSASSA-PSS" with additional PSSParameterSpecs instead.
+        JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_256, "SHA256withRSA/PSS");
         JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_384, "SHA384withRSA/PSS");
         JAVA_ALGORITHM_NAMES.put(AlgorithmID.RSA_PSS_512, "SHA512withRSA/PSS");
     }
@@ -93,11 +105,15 @@ public class WebAuthnAuthenticator implements Authenticator {
         this.random = new SecureRandom();
     }
 
+    /**
+     * Creates a new builder that can be used to configure instances of this class.
+     *
+     * @return a new {@link WebAuthnAuthenticatorBuilder} object.
+     */
     public static WebAuthnAuthenticatorBuilder builder() {
         return new WebAuthnAuthenticatorBuilder();
     }
 
-    // see https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-make-cred
     @Override
     public CBORObject makeCredential(
             byte[] hash, RelyingPartyIdentity rpEntity, UserIdentity userEntity, boolean requireResidentKey,
@@ -159,7 +175,7 @@ public class WebAuthnAuthenticator implements Authenticator {
             credentialSource.setId(new ByteArray(credentialId));
             storedSources.put(new SourceKey(rpEntity.getId(), userHandle), credentialSource);
         } else {
-            credentialId = credentialSource.encrypt();
+            credentialId = credentialSource.serialize();
         }
 
         byte[] cosePublicKey = key.PublicKey().EncodeToBytes();
@@ -249,13 +265,14 @@ public class WebAuthnAuthenticator implements Authenticator {
     }
 
     private Optional<PublicKeyCredentialSource> lookup(ByteArray credentialId) {
-        return PublicKeyCredentialSource.decrypt(credentialId)
+        return PublicKeyCredentialSource.deserialize(credentialId)
                 .map(Optional::of)
                 .orElseGet(() -> storedSources.values().stream().filter(source -> source.getId().equals(credentialId)).findFirst());
     }
 
     private byte[] computeSignature(AlgorithmID alg, byte[] rgbToBeSigned, OneKey cnKey) {
         String algName = JAVA_ALGORITHM_NAMES.get(alg);
+
         if (algName == null) {
             throw new UnsupportedOperationException("Unsupported Algorithm Specified");
         }
@@ -269,6 +286,7 @@ public class WebAuthnAuthenticator implements Authenticator {
         byte[] result;
         try {
             Signature sig = Signature.getInstance(algName);
+            // FIXME: 15/09/2022 provide algorithm parameter spec if required
             sig.initSign(privKey);
             sig.update(rgbToBeSigned);
             result = sig.sign();

@@ -6,7 +6,6 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.data.AttestationConveyancePreference;
 import com.yubico.webauthn.data.AuthenticatorAssertionResponse;
-import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.AuthenticatorAttestationResponse;
 import com.yubico.webauthn.data.AuthenticatorSelectionCriteria;
 import com.yubico.webauthn.data.ByteArray;
@@ -37,7 +36,18 @@ import java.util.Optional;
 import java.util.Set;
 
 // TODO: 14/09/2022 remove yubico dependency, write own required data structures with json serialisation support
-// navigator.credentials simulator
+/**
+ * This class emulates the behaviour of the <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer">CredentialsContainer</a>
+ * browser API for WebAuthn credentials, allowing you to create and get WebAuthn credentials, similar to how you would use
+ * {@code navigator.credentials...} in a browser.
+ *
+ * @apiNote Not all CredentialsContainer methods are provided:
+ * <ul>
+ *     <li>{@code store()} <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-storeCredential">does not have any functionality in WebAuthn.</a></li>
+ *     <li>{@code preventSilentAccess()} has no use in this library's scope.</li>
+ * </ul>
+ * @see <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer">CredentialsContainer</a>
+ */
 public class CredentialsContainer {
 
     private final Origin origin;
@@ -45,26 +55,37 @@ public class CredentialsContainer {
 
     private final ObjectMapper mapper;
 
+    /**
+     * Creates a new CredentialsContainer with the specified {@link Origin} and a list of "known" authenticators.
+     *
+     * @param origin The origin of the emulated "context".
+     * @param authenticators A list of authenticators that are available to this container.
+     *                       This list will be queried to create/get WebAuthn credentials.
+     */
     public CredentialsContainer(Origin origin, List<? extends Authenticator> authenticators) {
         this.origin = origin;
         this.authenticators = new ArrayList<>(authenticators);
         this.mapper = new ObjectMapper();
     }
 
-    public boolean isUserVerifyingPlatformAuthenticatorAvailable() {
-        return authenticators.stream()
-                .anyMatch(auth -> auth.supportsUserVerification()
-                        && auth.getAttachment() == AuthenticatorAttachment.PLATFORM);
-    }
-
+    /**
+     * Implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create">CredentialsContainer.create()></a>
+     * for WebAuthn.
+     *
+     * @param publicKey The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#dictdef-publickeycredentialcreationoptions">PublicKeyCredentialOptions</a>
+     *                  provided by the Relying Party.
+     * @return The newly created <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#publickeycredential">PublicKeyCredential</a>.
+     * @throws IllegalArgumentException if the parameters are malformed in any way or some security check fails
+     * @throws IllegalStateException if an authenticator throws one.
+     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-createCredential>Create a New Credential</a>
+     */
     public PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
             PublicKeyCredentialCreationOptions publicKey
     ) {
         return create(origin, publicKey, true);
     }
 
-    // following https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-createCredential
-    public PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
+    private PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
             Origin origin,
             PublicKeyCredentialCreationOptions options,
             boolean sameOriginWithAncestors
@@ -184,6 +205,20 @@ public class CredentialsContainer {
         return credentialId;
     }
 
+    /**
+     * Implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/get">CredentialsContainer.get()</a>
+     * for WebAuthn.
+     *
+     * @param publicKey The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#dictdef-publickeycredentialrequestoptions">PublicKeyCredentialRequestOptions</a>
+     *                  provided by the Relying Party.
+     * @return The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#publickeycredential">PublicKeyCredential</a> object with the assertion.
+     * @throws IllegalArgumentException if any of the parameters are malformed in any way or a security check fails.
+     * @throws RuntimeException if any other unexpected exception occurs during the assertion process.
+     * @implNote This implementation does not pre-filter the list of allowed credentials for every authenticator.
+     * Instead, it passes the full list of allowed credential to every requested authenticator.
+     * Furthermore, it performs no filtering based on available transports because that is not relevant to software authenticators.
+     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-getAssertion">Use an Existing Credential to Make an Assertion</a>
+     */
     public PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionOutputs> get(
             PublicKeyCredentialRequestOptions publicKey
     ) {
@@ -209,8 +244,7 @@ public class CredentialsContainer {
             // skip narrowing this list down to this specific authenticator
             List<PublicKeyCredentialDescriptor> allowCredentials = options.getAllowCredentials().orElse(Collections.emptyList());
 
-            // skip temporarily saving credential id if there is only one available - authenticator will always return the id that was used.
-            // this is technically a deviation from the spec, but in software context there is no reason to not return the credential id every time
+            ByteArray credentialId = allowCredentials.size() == 1 ? allowCredentials.get(0).getId() : null;
 
             // skip transport handling (also not relevant for software authenticators)
 
@@ -226,6 +260,10 @@ public class CredentialsContainer {
                 );
             } catch (RuntimeException e) {
                 continue;
+            }
+
+            if (credentialId != null) {
+                assertionData.setCredentialId(credentialId);
             }
 
             try {
@@ -255,11 +293,15 @@ public class CredentialsContainer {
 
     private void checkParameters(String rpId, Origin origin, boolean sameOriginWithAncestors) {
         // 2.
-        Checks.check(sameOriginWithAncestors, "NotAllowedError (sameOriginWithAncestors)");
+        if (!sameOriginWithAncestors) {
+            throw new IllegalArgumentException("NotAllowedError (sameOriginWithAncestors)");
+        }
         // 4. skip irrelevant timeout steps
         // 5. skip irrelevant user id check
         // 6.
-        Checks.check(origin != null, "NotAllowedError (opaque origin)");
+        if (!(origin != null)) {
+            throw new IllegalArgumentException("NotAllowedError (opaque origin)");
+        }
         // 7.
         String effectiveDomain = origin.effectiveDomain();
         // TODO: 25/08/2022 validate domain
