@@ -1,2 +1,2 @@
-rootProject.name = "softauthn-java"
+rootProject.name = "softauthn"
 
