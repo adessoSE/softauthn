@@ -42,8 +42,8 @@ Additionally, only the algorithms/COSE specifiers supported by `java-webauthn-se
 Currently, those are:
 - EdDSA
 - ES256
-- RS256
-- RS1
+- RS256 (WIP)
+- RS1 (WIP)
 
 See [IANA COSE Algorithm Registry](https://www.iana.org/assignments/cose/cose.xhtml#algorithms) for reference.
 If this list is out of date because `java-webauthn-server` added a new algorithm, feel free to create an issue in 

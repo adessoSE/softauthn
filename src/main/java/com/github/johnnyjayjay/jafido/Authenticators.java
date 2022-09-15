@@ -1,24 +1,39 @@
 package com.github.johnnyjayjay.jafido;
 
+import com.github.johnnyjayjay.jafido.counter.NoSignatureCounter;
+import com.github.johnnyjayjay.jafido.counter.PerCredentialSignatureCounter;
+import com.yubico.webauthn.data.AuthenticatorAttachment;
+
+import java.util.Base64;
+
 public final class Authenticators {
 
     private Authenticators() {
 
     }
 
-    public static WebAuthnAuthenticator yubikey5() {
-        // TODO: 14/09/2022 return authenticator that behaves like a new yubikey
-        return null;
+    public static WebAuthnAuthenticatorBuilder yubikey5Nfc() {
+        return WebAuthnAuthenticator.builder()
+                .attachment(AuthenticatorAttachment.CROSS_PLATFORM)
+                .supportClientSideDiscoverablePublicKeyCredentialSources(true)
+                .supportUserVerification(true)
+                .signatureCounter(new PerCredentialSignatureCounter())
+                .aaguid(Base64.getDecoder().decode("2fc0579f811347eab116bb5a8db9202a"));
     }
 
-    public static WebAuthnAuthenticator platform() {
-        // TODO: 14/09/2022 return authenticator of type platform
-        return null;
+    public static WebAuthnAuthenticatorBuilder platform() {
+        return WebAuthnAuthenticator.builder()
+                .attachment(AuthenticatorAttachment.PLATFORM)
+                .supportUserVerification(true)
+                .supportClientSideDiscoverablePublicKeyCredentialSources(true)
+                .signatureCounter(new PerCredentialSignatureCounter());
     }
 
-    public static WebAuthnAuthenticator u2f() {
-        // TODO: 14/09/2022 return "U2F" style authenticator (no resident keys, no signature counter)
-        return null;
+    public static WebAuthnAuthenticatorBuilder u2f() {
+        return WebAuthnAuthenticator.builder()
+                .attachment(AuthenticatorAttachment.CROSS_PLATFORM)
+                .supportClientSideDiscoverablePublicKeyCredentialSources(false)
+                .signatureCounter(new NoSignatureCounter());
     }
 
     public static Authenticator broken() {

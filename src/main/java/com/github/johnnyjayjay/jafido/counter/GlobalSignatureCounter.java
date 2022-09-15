@@ -7,6 +7,10 @@ public class GlobalSignatureCounter implements SignatureCounter {
     private final int increment;
     private int globalCount;
 
+    public GlobalSignatureCounter() {
+        this(0, 1);
+    }
+
     public GlobalSignatureCounter(int initialValue, int increment) {
         this.increment = increment;
         this.globalCount = initialValue;

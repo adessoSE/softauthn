@@ -22,7 +22,6 @@ import java.nio.charset.StandardCharsets;
 import java.security.InvalidKeyException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.security.NoSuchProviderException;
 import java.security.PrivateKey;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -43,6 +42,7 @@ import java.util.function.Function;
 
 public class WebAuthnAuthenticator implements Authenticator {
 
+    private static final Set<COSEAlgorithmIdentifier> COSE_LIB_SUPPORT = EnumSet.of(COSEAlgorithmIdentifier.ES256, COSEAlgorithmIdentifier.EdDSA);
     private static final Map<AlgorithmID, String> JAVA_ALGORITHM_NAMES = new HashMap<>();
 
     static {
@@ -61,7 +61,7 @@ public class WebAuthnAuthenticator implements Authenticator {
 
     private final byte[] aaguid;
     private final AuthenticatorAttachment attachment;
-    private final Set<AlgorithmID> supportedAlgorithms;
+    private final Set<COSEAlgorithmIdentifier> supportedAlgorithms;
     private final boolean supportsClientSideDiscoverablePublicKeyCredentialSources;
 
     private final boolean supportsUserVerification;
@@ -70,14 +70,10 @@ public class WebAuthnAuthenticator implements Authenticator {
 
     private Function<? super Set<PublicKeyCredentialSource>, PublicKeyCredentialSource> credentialSelection;
 
-    public static void main(String[] args) throws NoSuchAlgorithmException {
-        Signature.getInstance("NONEwithEdDSA");
-    }
-
     protected WebAuthnAuthenticator(
             byte[] aaguid,
             AuthenticatorAttachment attachment,
-            Collection<AlgorithmID> supportedAlgorithms,
+            Collection<COSEAlgorithmIdentifier> supportedAlgorithms,
             boolean supportsClientSideDiscoverablePublicKeyCredentialSources,
             boolean supportsUserVerification,
             SignatureCounter signatureCounter,
@@ -131,10 +127,8 @@ public class WebAuthnAuthenticator implements Authenticator {
         }
 
 
-        AlgorithmID algId = credTypesAndPubKeyAlgs.stream()
+        COSEAlgorithmIdentifier algId = credTypesAndPubKeyAlgs.stream()
                 .map(PublicKeyCredentialParameters::getAlg)
-                .map(this::convertAlgId)
-                .filter(Objects::nonNull)
                 .filter(supportedAlgorithms::contains)
                 .findFirst()
                 .orElseThrow(() -> new UnsupportedOperationException("Authenticator does not support any of the available algorithms"));
@@ -142,7 +136,8 @@ public class WebAuthnAuthenticator implements Authenticator {
 
         OneKey key;
         try {
-            key = OneKey.generateKey(algId);
+            // TODO: 15/09/2022 support RS256 and RS1 here
+            key = OneKey.generateKey(AlgorithmID.FromCBOR(CBORObject.FromObject((int) algId.getId())));
         } catch (CoseException e) {
             throw new UnsupportedOperationException("Algorithm " + algId + " not supported", e);
         }

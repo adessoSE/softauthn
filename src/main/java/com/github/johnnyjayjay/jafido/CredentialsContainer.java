@@ -217,7 +217,7 @@ public class CredentialsContainer {
             // skip transport handling (also not relevant for software authenticators)
 
 
-            AuthenticatorAssertionData assertionData = null;
+            AuthenticatorAssertionData assertionData;
             try {
                 assertionData = authenticator.getAssertion(
                         options.getRpId(),
