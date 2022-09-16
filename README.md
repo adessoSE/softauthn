@@ -17,18 +17,35 @@ like "real" ones in pure software.
 ### Creating and Registering authenticators
 ```java
 // Create an authenticator that will implement the functionality of a WebAuthn authenticator in pure software
-// This one mimics a traditional USB key: it is external (attachment), does not have proper storage for keys and can verify users (e.g. via a pin code)
-var authenticator = new Authenticator(AuthenticatorAttachment.CROSS_PLATFORM, false, true);
-// Create a credentials environment (mimics the browser navigator.credentials API)
-// It will pretend its origin is https://example.com
-var credentials = new Credentials("https://example.com", List.of(authenticator));
-// Get the options for credential creation from your backend
-PublicKeyCredentialCreationOptions opts = callYourBackend();
+// This one mimics a modern USB key: it is external (cross-platform attachment),
+// can store keys internally and can verify users (e.g. via a pin code)
+var authenticator = WebAuthnAuthenticator.builder()
+        .attachment(AuthenticatorAttachment.CROSS_PLATFORM)
+        .supportClientSideDiscoverablePublicKeyCredentials(true)
+        .supportUserVerification(true)
+        .build();
 
-credentials.create(opts);
+// alternatively, you can use one of the templates in the Authenticators class
+authenticator = Authenticators.yubikey5Nfc().build();
+// Create a credentials container (mimics the browser navigator.credentials API)
+// It will pretend its origin is https://example.com (no port, no extra domain)
+var origin = new Origin("https", "example.com", -1, null);
+var credentials = new CredentialsContainer(origin, List.of(authenticator));
+// Get the options for credential creation from your backend
+PublicKeyCredentialCreationOptions opts = startRegistration(...);
+PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionsResult> publicKeyCredential = credentials.create(opts);
+verifyAttestation(publicKeyCredential);
 ```
 
 ### Creating Assertions
+
+```java
+// same environment as above, get request options from your backend somehow
+PublicKeyCredentialRequestOptions opts = startAssertion(...);
+// will create an appropriate assertion (or null if no matching credential can be found)
+PublicKeyCredential<AuthenticatorAssertionResponse, ClientAssertionExtensionsResult> credential = credentials.get(opts);
+verifyAssertion(credential);
+```
 
 ## Completeness
 
