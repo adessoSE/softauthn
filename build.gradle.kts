@@ -21,6 +21,9 @@ tasks.getByName<Test>("test") {
     useJUnitPlatform()
 }
 
+tasks.javadoc {
+    (options as StandardJavadocDocletOptions).tags("apiNote:a:API Note:", "implNote:a:Implementation Note:")
+}
 
 publishing {
 

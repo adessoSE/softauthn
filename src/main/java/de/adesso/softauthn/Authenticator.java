@@ -16,7 +16,7 @@ import java.util.Set;
  * spec (see below).
  *
  * @apiNote Not every authenticator operation is implemented. Specifically,
- * <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-cancel>authenticatorCancel</a> is
+ * <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-cancel">authenticatorCancel</a> is
  * missing because it serves no purpose in a non-concurrent software environment.
  *
  * @implNote The intention behind this interface is to allow the definition of WebAuthn authenticators in software
@@ -65,7 +65,7 @@ public interface Authenticator {
      * Method that will be called by a client platform to create an assertion for an existing credential.
      *
      * @param rpId The caller’s <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#rp-id">RP ID</a>, as determined by the user agent and the client.
-     * @param hash The hash of the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#collectedclientdata-hash-of-the-serialized-client-data>serialized client data</a>, provided by the client.
+     * @param hash The hash of the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#collectedclientdata-hash-of-the-serialized-client-data">serialized client data</a>, provided by the client.
      * @param allowedCredentialDescriptorList A nullable list of PublicKeyCredentialDescriptors describing credentials acceptable to the Relying Party (possibly filtered by the client), if any.
      * @param requireUserVerification The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#effective-user-verification-requirement-for-assertion">effective user verification requirement for assertion</a>, a Boolean value provided by the client.
      * @param extensions A CBOR map from extension identifiers to their authenticator extension inputs, created by the client based on the extensions requested by the Relying Party, if any.
@@ -73,7 +73,7 @@ public interface Authenticator {
      * @throws IllegalArgumentException If the parameters are malformed in any way.
      * @throws NoSuchElementException If this authenticator cannot find any matching credential.
      *
-     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-get-assertion>The authenticatorGetAssertion Operation</a>
+     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-get-assertion">The authenticatorGetAssertion Operation</a>
      */
     AuthenticatorAssertionData getAssertion(
             String rpId, byte[] hash,
@@ -82,7 +82,7 @@ public interface Authenticator {
     ) throws IllegalArgumentException, NoSuchElementException;
 
     /**
-     * Returns this authenticator's <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-authenticator-attachment-modality>attachment</a>.
+     * Returns this authenticator's <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-authenticator-attachment-modality">attachment</a>.
      *
      * @return the attachment.
      */
@@ -101,7 +101,7 @@ public interface Authenticator {
      * Returns whether this authenticator can perform <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#user-verification">user verification</a>.
      *
      * @return Whether user verification is supported.
-     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-authentication-factor-capability>Authentication Factor Capability</a>
+     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-authentication-factor-capability">Authentication Factor Capability</a>
      */
     boolean supportsUserVerification();
 }

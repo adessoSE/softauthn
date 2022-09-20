@@ -69,7 +69,7 @@ public class CredentialsContainer {
     }
 
     /**
-     * Implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create">CredentialsContainer.create()></a>
+     * Implementation of <a href="https://developer.mozilla.org/en-US/docs/Web/API/CredentialsContainer/create">CredentialsContainer.create()</a>
      * for WebAuthn.
      *
      * @param publicKey The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#dictdef-publickeycredentialcreationoptions">PublicKeyCredentialOptions</a>
@@ -77,7 +77,7 @@ public class CredentialsContainer {
      * @return The newly created <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#publickeycredential">PublicKeyCredential</a>.
      * @throws IllegalArgumentException if the parameters are malformed in any way or some security check fails
      * @throws IllegalStateException if an authenticator throws one.
-     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-createCredential>Create a New Credential</a>
+     * @see <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-createCredential">Create a New Credential</a>
      */
     public PublicKeyCredential<AuthenticatorAttestationResponse, ClientRegistrationExtensionOutputs> create(
             PublicKeyCredentialCreationOptions publicKey

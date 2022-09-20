@@ -41,7 +41,7 @@ public class PublicKeyCredentialSource {
   }
 
   /**
-   * See {@link this#PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
+   * See {@link #PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
    *
    * @return credential type.
    */
@@ -50,7 +50,7 @@ public class PublicKeyCredentialSource {
   }
 
   /**
-   * See {@link this#PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
+   * See {@link #PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
    *
    * @return the (private) key.
    */
@@ -59,7 +59,7 @@ public class PublicKeyCredentialSource {
   }
 
   /**
-   * See {@link this#PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
+   * See {@link #PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
    *
    * @return relying party id.
    */
@@ -68,7 +68,7 @@ public class PublicKeyCredentialSource {
   }
 
   /**
-   * See {@link this#PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
+   * See {@link #PublicKeyCredentialSource(PublicKeyCredentialType, OneKey, String, ByteArray) constructor} for a description of this field.
    *
    * @return user handle.
    */

@@ -16,8 +16,8 @@ public class AuthenticatorAssertionData {
      * Public constructor of this data class.
      *
      * @param credentialId The id of the credential that was used to create the assertion.
-     * @param authenticatorData The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#authenticator-data>authenticator data</a> created in the process.
-     * @param signature The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#assertion-signature>assertion signature</a> produced in the process.
+     * @param authenticatorData The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#authenticator-data">authenticator data</a> created in the process.
+     * @param signature The <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#assertion-signature">assertion signature</a> produced in the process.
      * @param userHandle The user handle of the user this credential belongs to.
      */
     public AuthenticatorAssertionData(ByteArray credentialId, ByteArray authenticatorData, ByteArray signature, ByteArray userHandle) {
@@ -28,7 +28,7 @@ public class AuthenticatorAssertionData {
     }
 
     /**
-     * See {@link this#AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
+     * See {@link #AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
      *
      * @return The credential id.
      */
@@ -47,7 +47,7 @@ public class AuthenticatorAssertionData {
     }
 
     /**
-     * See {@link this#AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
+     * See {@link #AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
      *
      * @return The authenticator data bytes.
      */
@@ -56,7 +56,7 @@ public class AuthenticatorAssertionData {
     }
 
     /**
-     * See {@link this#AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
+     * See {@link #AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
      *
      * @return The assertion signature.
      */
@@ -65,7 +65,7 @@ public class AuthenticatorAssertionData {
     }
 
     /**
-     * See {@link this#AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
+     * See {@link #AuthenticatorAssertionData(ByteArray, ByteArray, ByteArray, ByteArray) constructor} for a description of this field.
      *
      * @return The user handle.
      */
