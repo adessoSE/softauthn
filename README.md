@@ -14,6 +14,8 @@ like "real" ones in pure software.
 
 TBA
 
+The first release of this library is still in development.
+
 ## Usage
 
 ### Creating and Registering authenticators
