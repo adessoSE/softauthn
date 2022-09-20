@@ -12,6 +12,8 @@ like "real" ones in pure software.
 
 ## Installation
 
+TBA
+
 ## Usage
 
 ### Creating and Registering authenticators
