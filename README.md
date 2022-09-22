@@ -12,9 +12,21 @@ like "real" ones in pure software.
 
 ## Installation
 
-TBA
+The first release of this library is still in development. Current snapshots can be added via jitpack,
+using `-SNAPSHOT` or a commit hash as the version specifier:
 
-The first release of this library is still in development.
+```kotlin
+repositories {
+    maven("https://jitpack.io")
+}
+
+dependencies {
+    implementation("com.github.adessoSE:softauthn:-SNAPSHOT")
+    // or pin it to a specific commit
+    implementation("com.github.adessoSE:softauthn:a4af413c27")
+}
+```
+
 
 ## Usage
 
