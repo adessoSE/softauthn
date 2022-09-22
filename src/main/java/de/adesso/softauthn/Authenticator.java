@@ -6,6 +6,7 @@ import com.yubico.webauthn.data.PublicKeyCredentialDescriptor;
 import com.yubico.webauthn.data.PublicKeyCredentialParameters;
 import com.yubico.webauthn.data.RelyingPartyIdentity;
 import com.yubico.webauthn.data.UserIdentity;
+import de.adesso.softauthn.authenticator.WebAuthnAuthenticator;
 
 import java.util.List;
 import java.util.NoSuchElementException;

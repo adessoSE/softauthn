@@ -1,5 +1,6 @@
-package de.adesso.softauthn;
+package de.adesso.softauthn.authenticator;
 
+import de.adesso.softauthn.PublicKeyCredentialSource;
 import de.adesso.softauthn.counter.PerCredentialSignatureCounter;
 import de.adesso.softauthn.counter.SignatureCounter;
 import com.yubico.webauthn.data.AuthenticatorAttachment;

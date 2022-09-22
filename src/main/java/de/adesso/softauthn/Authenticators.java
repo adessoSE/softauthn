@@ -3,6 +3,8 @@ package de.adesso.softauthn;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
 import com.yubico.webauthn.data.ByteArray;
 import com.yubico.webauthn.data.exception.HexException;
+import de.adesso.softauthn.authenticator.WebAuthnAuthenticator;
+import de.adesso.softauthn.authenticator.WebAuthnAuthenticatorBuilder;
 import de.adesso.softauthn.counter.NoSignatureCounter;
 import de.adesso.softauthn.counter.PerCredentialSignatureCounter;
 

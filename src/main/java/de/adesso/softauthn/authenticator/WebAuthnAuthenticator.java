@@ -1,9 +1,13 @@
-package de.adesso.softauthn;
+package de.adesso.softauthn.authenticator;
 
 import COSE.AlgorithmID;
 import COSE.CoseException;
 import COSE.KeyKeys;
 import COSE.OneKey;
+import de.adesso.softauthn.Authenticator;
+import de.adesso.softauthn.AuthenticatorAssertionData;
+import de.adesso.softauthn.Authenticators;
+import de.adesso.softauthn.PublicKeyCredentialSource;
 import de.adesso.softauthn.counter.SignatureCounter;
 import com.upokecenter.cbor.CBORObject;
 import com.yubico.webauthn.data.AuthenticatorAttachment;
