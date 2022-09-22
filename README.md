@@ -21,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    implementation("com.github.adessoSE:softauthn:-SNAPSHOT")
+    implementation("com.github.adessoSE:softauthn:main-SNAPSHOT")
     // or pin it to a specific commit
     implementation("com.github.adessoSE:softauthn:a4af413c27")
 }

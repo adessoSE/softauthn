@@ -87,7 +87,7 @@ public class PublicKeyCredentialSource {
   public byte[] serialize() {
     CBORObject map = CBORObject.NewMap()
             .Set("type", type.ordinal())
-            .Set("key", key.EncodeToBytes())
+            .Set("key", key.AsCBOR())
             .Set("rpId", rpId);
     if (userHandle != null) {
       map.Set("user", userHandle.getBytes());
