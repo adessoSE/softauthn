@@ -94,3 +94,11 @@ This module differs from softauthn in a few ways:
 
 The last point on this list may have the biggest impact on your convenience depending on how you 
 implemented WebAuthn in your app.
+
+## Licensing
+
+This project is licensed under the [MIT License](./LICENSE), but it depends on projects with different licensing
+which may be relevant to you:
+
+- [java-webauthn-server](https://github.com/Yubico/java-webauthn-server/blob/main/COPYING)
+- [COSE-JAVA](https://github.com/cose-wg/COSE-JAVA/blob/master/LICENSE)
