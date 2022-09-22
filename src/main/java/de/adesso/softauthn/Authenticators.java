@@ -41,10 +41,5 @@ public final class Authenticators {
                 .signatureCounter(new NoSignatureCounter());
     }
 
-    public static Authenticator broken() {
-        // TODO: 14/09/2022 implementation of authenticator that returns bogus data
-        return null;
-    }
-
 
 }
