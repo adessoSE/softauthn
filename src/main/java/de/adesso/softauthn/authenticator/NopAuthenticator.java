@@ -14,32 +14,56 @@ import java.util.NoSuchElementException;
 import java.util.Set;
 
 /**
- * Authenticator implementation that does nothing except throw an error.
- * This results in it being ignored by {@link de.adesso.softauthn.CredentialsContainer} instances.
+ * Authenticator implementation that does nothing except throw an exception
+ * when asked to create an attestation or an assertion.
+ * <p>This results in it being ignored by {@link de.adesso.softauthn.CredentialsContainer} instances.
  */
 public class NopAuthenticator implements Authenticator {
-    @Override
-    public CBORObject makeCredential(byte[] hash, RelyingPartyIdentity rpEntity, UserIdentity userEntity, boolean requireResidentKey, boolean requireUserVerification, List<PublicKeyCredentialParameters> credTypesAndPubKeyAlgs, Set<PublicKeyCredentialDescriptor> excludeCredentials, boolean enterpriseAttestationPossible, byte[] extensions) throws IllegalArgumentException, UnsupportedOperationException, IllegalStateException {
-        return null;
+
+    private final AuthenticatorAttachment attachment;
+
+    public NopAuthenticator(AuthenticatorAttachment attachment) {
+        this.attachment = attachment;
     }
 
+    /**
+     * Implementation that <strong>always</strong> throws an {@code UnsupportedOperationException}.
+     * @inheritDoc
+     */
     @Override
-    public AuthenticatorAssertionData getAssertion(String rpId, byte[] hash, List<PublicKeyCredentialDescriptor> allowedCredentialDescriptorList, boolean requireUserVerification, byte[] extensions) throws IllegalArgumentException, NoSuchElementException {
-        return null;
+    public CBORObject makeCredential(
+            byte[] hash, RelyingPartyIdentity rpEntity, UserIdentity userEntity, boolean requireResidentKey,
+            boolean requireUserVerification, List<PublicKeyCredentialParameters> credTypesAndPubKeyAlgs,
+            Set<PublicKeyCredentialDescriptor> excludeCredentials, boolean enterpriseAttestationPossible,
+            byte[] extensions
+    ) throws IllegalArgumentException, UnsupportedOperationException, IllegalStateException {
+        throw new UnsupportedOperationException("I don't do anything");
+    }
+
+    /**
+     * Implementation that <strong>always</strong> throws an {@code UnsupportedOperationException}.
+     * @inheritDoc
+     */
+    @Override
+    public AuthenticatorAssertionData getAssertion(
+            String rpId, byte[] hash, List<PublicKeyCredentialDescriptor> allowedCredentialDescriptorList,
+            boolean requireUserVerification, byte[] extensions
+    ) throws IllegalArgumentException, NoSuchElementException {
+        throw new UnsupportedOperationException("I don't do anything");
     }
 
     @Override
     public AuthenticatorAttachment getAttachment() {
-        return null;
+        return attachment;
     }
 
     @Override
     public boolean supportsClientSideDiscoverablePublicKeyCredentialSources() {
-        return false;
+        return true;
     }
 
     @Override
     public boolean supportsUserVerification() {
-        return false;
+        return true;
     }
 }
