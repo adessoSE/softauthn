@@ -37,6 +37,8 @@ public interface Authenticator {
     /**
      * Method that will be called by a client platform to create a new credential on this authenticator.
      *
+     * @apiNote What this method does exactly is up to the authenticator implementation, e.g. an implementation may
+     * intentionally choose to deviate from the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-make-cred">algorithm described in the WebAuthn specification</a>.
      * @param hash The hash of the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#collectedclientdata-hash-of-the-serialized-client-data">serialized client data</a>, provided by the client.
      * @param rpEntity The Relying Party entity
      * @param userEntity The user account's entity, containing the user handle given by the Relying Party.
@@ -65,6 +67,8 @@ public interface Authenticator {
     /**
      * Method that will be called by a client platform to create an assertion for an existing credential.
      *
+     * @apiNote What this method does exactly is up to the authenticator implementation, e.g. an implementation may
+     * intentionally choose to deviate from the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#sctn-op-get-assertion">algorithm described in the WebAuthn specification</a>.
      * @param rpId The caller’s <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#rp-id">RP ID</a>, as determined by the user agent and the client.
      * @param hash The hash of the <a href="https://www.w3.org/TR/2021/REC-webauthn-2-20210408/#collectedclientdata-hash-of-the-serialized-client-data">serialized client data</a>, provided by the client.
      * @param allowedCredentialDescriptorList A nullable list of PublicKeyCredentialDescriptors describing credentials acceptable to the Relying Party (possibly filtered by the client), if any.
