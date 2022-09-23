@@ -40,6 +40,23 @@ publishing {
 
     publications {
         create<MavenPublication>("main") {
+            pom {
+                scm {
+                    url.set("https://github.com/adessoSE/softauthn")
+                }
+                licenses {
+                    license {
+                        name.set("MIT")
+                        url.set("https://mit-license.org")
+                    }
+                }
+                developers {
+                    developer {
+                        organization.set("adesso SE")
+                        organizationUrl.set("https://adesso.de")
+                    }
+                }
+            }
             from(components["java"])
             artifact(sourcesJar)
             artifact(javadocJar)
