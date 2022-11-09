@@ -4,7 +4,7 @@ plugins {
     signing
 }
 
-group = "de.adesso"
+group = "io.github.adessose"
 version = "0.1.0"
 
 repositories {
