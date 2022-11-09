@@ -28,7 +28,7 @@ public class NopAuthenticator implements Authenticator {
 
     /**
      * Implementation that <strong>always</strong> throws an {@code UnsupportedOperationException}.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public CBORObject makeCredential(
@@ -42,7 +42,7 @@ public class NopAuthenticator implements Authenticator {
 
     /**
      * Implementation that <strong>always</strong> throws an {@code UnsupportedOperationException}.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public AuthenticatorAssertionData getAssertion(

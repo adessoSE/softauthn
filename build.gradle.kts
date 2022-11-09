@@ -14,12 +14,15 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.0")
     implementation("com.augustcellars.cose:cose-java:1.1.0")
+    implementation("com.fasterxml.jackson.core:jackson-databind:2.14.0-rc2")
     api("com.yubico:webauthn-server-core:2.1.0")
 }
 
-configure<JavaPluginExtension> {
+java {
     withSourcesJar()
     withJavadocJar()
+    sourceCompatibility = JavaVersion.VERSION_1_8
+    targetCompatibility = JavaVersion.VERSION_1_8
 }
 
 tasks.getByName<Test>("test") {

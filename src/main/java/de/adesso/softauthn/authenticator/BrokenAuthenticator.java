@@ -36,7 +36,7 @@ public class BrokenAuthenticator implements Authenticator {
     /**
      * @implNote This implementation simply delegates to the authenticator set
      * {@link #BrokenAuthenticator(Authenticator) at creation time}.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public CBORObject makeCredential(
@@ -61,7 +61,7 @@ public class BrokenAuthenticator implements Authenticator {
      *     <li>Replace the signature in the returned assertion data with random bytes (same length)</li>
      *     <li>Return the modified assertion data.</li>
      * </ol>
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public AuthenticatorAssertionData getAssertion(
@@ -77,7 +77,7 @@ public class BrokenAuthenticator implements Authenticator {
 
     /**
      * @implNote Delegates to the underlying authenticator.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public AuthenticatorAttachment getAttachment() {
@@ -86,7 +86,7 @@ public class BrokenAuthenticator implements Authenticator {
 
     /**
      * @implNote Delegates to the underlying authenticator.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean supportsClientSideDiscoverablePublicKeyCredentialSources() {
@@ -95,7 +95,7 @@ public class BrokenAuthenticator implements Authenticator {
 
     /**
      * @implNote Delegates to the underlying authenticator.
-     * @inheritDoc
+     * {@inheritDoc}
      */
     @Override
     public boolean supportsUserVerification() {
