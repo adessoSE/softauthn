@@ -39,6 +39,11 @@ publishing {
     publications {
         create<MavenPublication>("main") {
             pom {
+                name.set("softauthn")
+                description.set("softauthn provides an implementation of the WebAuthn API and a software authenticator " +
+                        "in Java, using the java-webauthn-server library for data models. It can be used to test " +
+                        "WebAuthn backends.")
+                url.set("https://github.com/adessoSE/softauthn")
                 scm {
                     url.set("https://github.com/adessoSE/softauthn")
                 }
