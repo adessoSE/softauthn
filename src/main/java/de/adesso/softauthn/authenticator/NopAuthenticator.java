@@ -22,6 +22,11 @@ public class NopAuthenticator implements Authenticator {
 
     private final AuthenticatorAttachment attachment;
 
+    /**
+     * Creates a {@code NopAuthenticator} with the given attachment.
+     *
+     * @param attachment the attachment of this authenticator (platform or cross-platform)
+     */
     public NopAuthenticator(AuthenticatorAttachment attachment) {
         this.attachment = attachment;
     }
