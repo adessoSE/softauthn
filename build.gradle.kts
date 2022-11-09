@@ -2,6 +2,7 @@ plugins {
     `java-library`
     `maven-publish`
     signing
+    id("io.github.gradle-nexus.publish-plugin") version "1.1.0"
 }
 
 group = "io.github.adessose"
@@ -63,15 +64,13 @@ publishing {
             from(components["java"])
         }
     }
+}
 
+nexusPublishing {
     repositories {
-        maven {
-            name = "OSSRH"
-            setUrl("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
-            credentials {
-                username = project.findProperty("osshrUsername") as String? ?: return@credentials
-                password = project.findProperty("osshrPassword") as String? ?: return@credentials
-            }
+        sonatype {
+            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
+            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
         }
     }
 }
