@@ -14,7 +14,12 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.9.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.9.0")
     implementation("com.augustcellars.cose:cose-java:1.1.0")
-    api("com.yubico:webauthn-server-core:2.0.0")
+    api("com.yubico:webauthn-server-core:2.1.0")
+}
+
+configure<JavaPluginExtension> {
+    withSourcesJar()
+    withJavadocJar()
 }
 
 tasks.getByName<Test>("test") {
@@ -23,17 +28,6 @@ tasks.getByName<Test>("test") {
 
 tasks.javadoc {
     (options as StandardJavadocDocletOptions).tags("apiNote:a:API Note:", "implNote:a:Implementation Note:")
-}
-
-val javadocJar = tasks.create<Jar>("javadocJar") {
-    dependsOn(tasks.javadoc)
-    archiveClassifier.set("javadoc")
-    from(tasks.javadoc.get().destinationDir)
-}
-
-val sourcesJar = tasks.create<Jar>("sourcesJar") {
-    archiveClassifier.set("sources")
-    from(sourceSets[SourceSet.MAIN_SOURCE_SET_NAME].allSource)
 }
 
 publishing {
@@ -58,8 +52,6 @@ publishing {
                 }
             }
             from(components["java"])
-            artifact(sourcesJar)
-            artifact(javadocJar)
         }
     }
 }

@@ -299,7 +299,7 @@ public class CredentialsContainer {
         // 4. skip irrelevant timeout steps
         // 5. skip irrelevant user id check
         // 6.
-        if (!(origin != null)) {
+        if (origin == null) {
             throw new IllegalArgumentException("NotAllowedError (opaque origin)");
         }
         // 7.
