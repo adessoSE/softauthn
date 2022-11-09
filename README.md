@@ -12,19 +12,27 @@ like "real" ones in pure software.
 
 ## Installation
 
-The first release of this library is still in development. Current snapshots can be added via jitpack,
-using `-SNAPSHOT` or a commit hash as the version specifier:
+Releases of this library can be found in Maven Central. Note that this project is still in its early stages and 
+therefore doesn't support all the features you might want to see yet. See [below](#Completeness) for more information.
 
+Gradle (Kotlin DSL):
 ```kotlin
 repositories {
-    maven("https://jitpack.io")
+    mavenCentral()
 }
 
 dependencies {
-    implementation("com.github.adessoSE:softauthn:main-SNAPSHOT")
-    // or pin it to a specific commit
-    implementation("com.github.adessoSE:softauthn:a3ce0ffd4caa3e0f35786f3e072f01f3ac873ef4")
+    implementation("io.github.adessose:softauthn:0.1.0")
 }
+```
+
+Maven: 
+```xml
+<dependency>
+    <groupId>io.github.adessose</groupId>
+    <artifactId>softauthn</artifactId>
+    <version>0.1.0</version>
+</dependency>
 ```
 
 
