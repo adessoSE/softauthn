@@ -1,6 +1,7 @@
 plugins {
     `java-library`
     `maven-publish`
+    signing
 }
 
 group = "de.adesso"
@@ -33,6 +34,9 @@ tasks.javadoc {
     (options as StandardJavadocDocletOptions).tags("apiNote:a:API Note:", "implNote:a:Implementation Note:")
 }
 
+val osshrUser: String by project
+val osshrPassword: String by project
+
 publishing {
 
     publications {
@@ -57,4 +61,20 @@ publishing {
             from(components["java"])
         }
     }
+
+    repositories {
+        maven {
+            name = "OSSRH"
+            setUrl("https://oss.sonatype.org/service/local/staging/deploy/maven2")
+            credentials {
+                username = osshrUser
+                password = osshrPassword
+            }
+        }
+    }
+}
+
+signing {
+    useGpgCmd()
+    sign(publishing.publications)
 }
