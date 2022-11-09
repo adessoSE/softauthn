@@ -34,9 +34,6 @@ tasks.javadoc {
     (options as StandardJavadocDocletOptions).tags("apiNote:a:API Note:", "implNote:a:Implementation Note:")
 }
 
-val osshrUser: String by project
-val osshrPassword: String by project
-
 publishing {
 
     publications {
@@ -67,8 +64,8 @@ publishing {
             name = "OSSRH"
             setUrl("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2")
             credentials {
-                username = osshrUser
-                password = osshrPassword
+                username = project.findProperty("osshrUsername") as String? ?: return@credentials
+                password = project.findProperty("osshrPassword") as String? ?: return@credentials
             }
         }
     }
