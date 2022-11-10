@@ -22,7 +22,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.adessose:softauthn:0.1.1")
+    implementation("io.github.adessose:softauthn:0.1.2")
 }
 ```
 
@@ -31,7 +31,7 @@ Maven:
 <dependency>
     <groupId>io.github.adessose</groupId>
     <artifactId>softauthn</artifactId>
-    <version>0.1.1</version>
+    <version>0.1.2</version>
 </dependency>
 ```
 
